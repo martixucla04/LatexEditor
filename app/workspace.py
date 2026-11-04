@@ -101,6 +101,29 @@ def import_zip(zip_path: Path, workspace: Path) -> Path:
     return dest
 
 
+def check_link_folder(folder: Path) -> Path:
+    """Validate a folder the user wants to open in place (no copy); returns it resolved.
+
+    It must exist, must not be a whole drive and must hold at least one .tex
+    file without being so large that the file tree would be unusable.
+    """
+    folder = Path(folder).resolve()
+    if not folder.is_dir():
+        raise UserError(f"Folder not found: {folder}")
+    if folder.parent == folder:
+        raise UserError(f"Choose the project folder, not the whole drive {folder}.")
+    count = 0
+    has_tex = False
+    for path in iter_project_files(folder):
+        count += 1
+        has_tex = has_tex or path.suffix.lower() == ".tex"
+        if count > MAX_FILES:
+            raise UserError(f"{folder.name} has more than {MAX_FILES} files. Choose the folder of one LaTeX project.")
+    if not has_tex:
+        raise UserError(f"No .tex file was found in {folder}. Choose the folder that contains your LaTeX project.")
+    return folder
+
+
 def iter_project_files(root: Path):
     """All files in a project, skipping app-owned entries, in a stable order."""
     for path in sorted(root.iterdir(), key=lambda p: p.name.lower()):

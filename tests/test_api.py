@@ -55,7 +55,7 @@ def test_dropped_files_are_forwarded_to_the_page(settings):
     ]}})
     api._on_drop({"dataTransfer": {}})  # nothing dropped: no call
     assert FakeWindow.scripts == [
-        'window.onFilesDropped && window.onFilesDropped(["C:\\\\Users\\\\me\\\\Tesi Mart\\u00ed\\\\paper.zip"])'
+        'window.onFilesDropped && window.onFilesDropped(["C:\\\\Users\\\\me\\\\Tesi Mart\\u00ed\\\\paper.zip"], [])'
     ]
 
 
@@ -69,3 +69,28 @@ def test_closing_guard(settings, monkeypatch):
     assert api._on_closing() is False
     monkeypatch.setattr(api_module, "ask_yes_no", lambda *a: True)
     assert api._on_closing() is True
+
+
+def test_link_folder_edits_in_place_and_is_marked_linked(settings, tmp_path, make_zip):
+    folder = tmp_path / "elsewhere" / "thesis"
+    folder.mkdir(parents=True)
+    (folder / "main.tex").write_text(DOC, encoding="utf-8")
+    api = Api(settings)
+
+    info = api.link_folder(str(folder))
+    assert info["root"] == str(folder.resolve())
+    assert info["main_file"] == "main.tex"
+    api.save_file("main.tex", DOC + "\n% edited")
+    assert (folder / "main.tex").read_text(encoding="utf-8").endswith("% edited")  # no copy
+
+    api.import_zip(str(make_zip({"main.tex": DOC})))
+    linked = {r["name"]: r["linked"] for r in api.recent_projects()}
+    assert linked == {"paper": False, "thesis": True}
+
+
+def test_link_folder_without_tex_is_refused(settings, tmp_path):
+    from app.errors import UserError
+
+    (tmp_path / "photos").mkdir()
+    with pytest.raises(UserError, match="No .tex file"):
+        Api(settings).link_folder(str(tmp_path / "photos"))

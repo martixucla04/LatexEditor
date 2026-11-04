@@ -25,7 +25,7 @@ from .logparser import collect_problems
 from .pdfserver import PdfServer
 from .project import Project
 from .settings import Settings
-from .workspace import export_zip, import_zip
+from .workspace import check_link_folder, export_zip, import_zip
 
 
 def detect_engine():
@@ -81,7 +81,10 @@ class Api:
         files = (event.get("dataTransfer") or {}).get("files") or []
         paths = [f["pywebviewFullPath"] for f in files if f.get("pywebviewFullPath")]
         if paths:
-            self._window.evaluate_js(f"window.onFilesDropped && window.onFilesDropped({json.dumps(paths)})")
+            folders = [p for p in paths if Path(p).is_dir()]
+            self._window.evaluate_js(
+                f"window.onFilesDropped && window.onFilesDropped({json.dumps(paths)}, {json.dumps(folders)})"
+            )
 
     def _on_closing(self):
         if self._dirty and not ask_yes_no("LaTeX Editor", "You have unsaved changes. Quit without saving?"):
@@ -151,11 +154,23 @@ class Api:
     # -- projects ----------------------------------------------------------------
 
     def recent_projects(self):
-        return self._settings.recent()
+        return self._recent()
 
     def remove_recent(self, path: str):
         self._settings.remove_recent(path)
-        return self._settings.recent()
+        return self._recent()
+
+    def _recent(self) -> list[dict]:
+        """Recent projects; `linked` marks folders opened in place, outside the projects folder."""
+        workspace = self._settings.workspace.resolve()
+        out = []
+        for item in self._settings.recent():
+            try:
+                linked = not Path(item["path"]).resolve().is_relative_to(workspace)
+            except OSError:
+                linked = True
+            out.append(dict(item, linked=linked))
+        return out
 
     def import_zip_dialog(self):
         paths = self._window.create_file_dialog(webview.FileDialog.OPEN, file_types=("ZIP archives (*.zip)",))
@@ -165,6 +180,17 @@ class Api:
 
     def import_zip(self, zip_path: str):
         return self._open(import_zip(Path(zip_path), self._settings.workspace))
+
+    def link_folder_dialog(self):
+        """Folder picker: open an existing LaTeX folder in place, without copying it."""
+        paths = self._window.create_file_dialog(webview.FileDialog.FOLDER)
+        if not paths:
+            return None
+        return self.link_folder(paths[0] if isinstance(paths, (list, tuple)) else paths)
+
+    def link_folder(self, path: str):
+        """Open a folder anywhere on disk as the project; edits are saved straight into it."""
+        return self._open(check_link_folder(Path(path)))
 
     def open_project(self, path: str):
         return self._open(Path(path))

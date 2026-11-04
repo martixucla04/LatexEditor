@@ -1,4 +1,5 @@
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -87,3 +88,27 @@ def test_export_roundtrip(make_zip, tmp_path):
     export_zip(root, dest)
     with zipfile.ZipFile(dest) as zf:
         assert {n: zf.read(n).decode() for n in zf.namelist()} == files
+
+
+def test_check_link_folder_accepts_latex_folder(tmp_path):
+    from app.workspace import check_link_folder
+
+    (tmp_path / "chapters").mkdir()
+    (tmp_path / "chapters" / "intro.tex").write_text("x", encoding="utf-8")
+    assert check_link_folder(tmp_path) == tmp_path.resolve()
+
+
+def test_check_link_folder_rejects_bad_folders(tmp_path, monkeypatch):
+    import app.workspace as ws
+
+    with pytest.raises(UserError, match="not found"):
+        ws.check_link_folder(tmp_path / "missing")
+    with pytest.raises(UserError, match="whole drive"):
+        ws.check_link_folder(Path(tmp_path.anchor))
+    (tmp_path / "notes.txt").write_text("x", encoding="utf-8")
+    with pytest.raises(UserError, match="No .tex file"):
+        ws.check_link_folder(tmp_path)
+    (tmp_path / "main.tex").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(ws, "MAX_FILES", 1)
+    with pytest.raises(UserError, match="more than 1 files"):
+        ws.check_link_folder(tmp_path)

@@ -6,6 +6,10 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
 ## Features
 
 - Import projects from `.zip` (button, Ctrl+O, or drag and drop onto the window); export back to `.zip`
+- **Open folder** (Ctrl+Alt+O, or drop a folder onto the window): work on a LaTeX folder where it
+  is, without copying it; saves go straight into it, and the app adds `.build/` (build output)
+  and `.latexeditor.json` (main file, spelling language) there. Linked folders are labelled in
+  the Recent lists
 - **Recent** menu in the toolbar (Ctrl+Shift+O) to switch projects; the last project reopens at
   startup (can be turned off in Settings)
 - File tree with new/rename/delete (Recycle Bin)/add files; tabs; Ctrl+S saves and compiles

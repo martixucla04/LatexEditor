@@ -407,6 +407,7 @@ body.resizing-col .pdf-viewer, body.resizing-row .editor { pointer-events: none;
 }
 
 .welcome .lead { margin: 0 0 20px; color: var(--text-muted); font-size: 14px; }
+.welcome-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .btn {
   height: 34px;

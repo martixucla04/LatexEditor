@@ -108,19 +108,45 @@ async function importZip(path = null) {
   }
 }
 
+// path: a folder already chosen (drag and drop); otherwise ask with the folder dialog.
+// The folder is opened in place: edits are saved straight into it, nothing is copied.
+async function linkFolder(path = null) {
+  if (!(await confirmLeaveProject())) return;
+  setStatus(path ? "Opening folder…" : "Choose the folder of a LaTeX project…");
+  try {
+    const info = await (path ? call("link_folder", path) : call("link_folder_dialog"));
+    if (info) {
+      await showProject(info);
+      toast(`Opened folder "${info.name}" (changes are saved in ${info.root})`, "success", 6000);
+    }
+  } catch (err) {
+    showError(err);
+  } finally {
+    if (/^(Choose|Opening)/.test($("status-message").textContent)) setStatus("Ready");
+  }
+}
+
 // Files dropped onto the window (full paths come from Python, see Api._on_drop).
-window.onFilesDropped = async (paths) => {
+// folders: the dropped paths that are folders.
+window.onFilesDropped = async (paths, folders = []) => {
   const zips = paths.filter((p) => p.toLowerCase().endsWith(".zip"));
-  if (zips.length === 1 && paths.length === 1) {
+  if (paths.length === 1 && zips.length === 1) {
     await importZip(zips[0]);
     return;
   }
-  if (!project) {
-    toast("Drop a single .zip file to import a project.", "warning");
+  if (paths.length === 1 && folders.length === 1) {
+    await linkFolder(folders[0]);
     return;
   }
+  if (!project) {
+    toast("Drop a single .zip file or a project folder to open it.", "warning");
+    return;
+  }
+  const files = paths.filter((p) => !zips.includes(p) && !folders.includes(p));
+  if (files.length < paths.length) toast("Folders and .zip files are skipped when adding several items. Drop one on its own to open it as a project.", "warning", 8000);
+  if (!files.length) return;
   try {
-    const added = await call("add_files", targetFolder(tree.find(tree.selected)), paths.filter((p) => !zips.includes(p)));
+    const added = await call("add_files", targetFolder(tree.find(tree.selected)), files);
     if (added.length) {
       await refreshProject();
       tree.setActive(added[0]);
@@ -230,7 +256,7 @@ async function showRecentMenu() {
   const rect = $("btn-recent").getBoundingClientRect();
   const entries = items.map((item) => ({
     label: item.name,
-    detail: item.exists ? item.path : "Folder not found",
+    detail: item.exists ? (item.linked ? `Linked folder · ${item.path}` : item.path) : "Folder not found",
     title: item.path,
     className: `recent-menu-item${project && item.path.toLowerCase() === project.root.toLowerCase() ? " current" : ""}`,
     disabled: !item.exists,
@@ -241,6 +267,7 @@ async function showRecentMenu() {
     ...entries,
     "-",
     { label: "Import .zip…", shortcut: "Ctrl+O", action: () => importZip() },
+    { label: "Open folder…", shortcut: "Ctrl+Alt+O", action: () => linkFolder() },
   ]);
 }
 
@@ -275,7 +302,7 @@ async function renderRecent() {
     open.title = item.exists ? item.path : `Folder not found: ${item.path}`;
     open.innerHTML = "<strong></strong><small></small>";
     open.querySelector("strong").textContent = item.name;
-    open.querySelector("small").textContent = item.exists ? item.path : "Folder not found";
+    open.querySelector("small").textContent = item.exists ? (item.linked ? `Linked folder · ${item.path}` : item.path) : "Folder not found";
     open.addEventListener("click", () => openProject(item.path));
 
     const remove = document.createElement("button");
@@ -611,6 +638,8 @@ function initToolbar() {
   $("btn-import").addEventListener("click", () => importZip());
   $("btn-recent").addEventListener("click", showRecentMenu);
   $("welcome-import").addEventListener("click", () => importZip());
+  $("btn-link").addEventListener("click", () => linkFolder());
+  $("welcome-link").addEventListener("click", () => linkFolder());
   initDropOverlay();
   $("btn-save").addEventListener("click", saveAll);
   $("btn-compile").addEventListener("click", onCompileButton);
@@ -671,6 +700,12 @@ function initShortcuts() {
       if (project) showSearch(editor.selectionText());
       return;
     }
+    if (event.ctrlKey && event.altKey && !event.shiftKey && event.code === "KeyO") {
+      event.preventDefault();
+      event.stopPropagation();
+      linkFolder();
+      return;
+    }
     if (event.ctrlKey && event.altKey && !event.shiftKey && event.code === "KeyJ") {
       event.preventDefault();
       event.stopPropagation();
@@ -716,6 +751,8 @@ async function showAppInfo() {
     $("workspace-line").textContent = `Projects are stored in ${info.workspace}`;
     $("btn-import").disabled = false;
     $("welcome-import").disabled = false;
+    $("btn-link").disabled = false;
+    $("welcome-link").disabled = false;
     setStatus("Ready");
   } catch (err) {
     line.textContent = err instanceof BackendUnavailable ? err.message : `Could not query the backend: ${err}`;

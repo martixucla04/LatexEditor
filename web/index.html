@@ -21,6 +21,10 @@
         <svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 12v6m-3-3 3 3 3-3"/></svg>
         <span>Import .zip</span>
       </button>
+      <button class="tb-btn" id="btn-link" disabled title="Open a project folder in place, without copying it (Ctrl+Alt+O)">
+        <svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M10.5 15.5a2.5 2.5 0 0 0 3.5 0l2-2a2.5 2.5 0 0 0-3.5-3.5l-.5.5"/><path d="M13.5 12.5a2.5 2.5 0 0 0-3.5 0l-2 2a2.5 2.5 0 0 0 3.5 3.5l.5-.5"/></svg>
+        <span>Open folder</span>
+      </button>
       <button class="tb-btn" id="btn-recent" title="Open a recent project (Ctrl+Shift+O)">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
         <span>Recent</span>
@@ -113,9 +117,13 @@
       <div class="editor-area" id="editor-area">
         <div class="welcome" id="welcome">
           <h1>Welcome</h1>
-          <p class="lead">Import a LaTeX project packed as a <code>.zip</code> to start editing.
+          <p class="lead">Import a LaTeX project packed as a <code>.zip</code> (copied into your projects
+            folder), or open a project folder in place (changes are saved straight into it).
             The PDF is compiled with LuaLaTeX and shown on the right.</p>
-          <button class="btn primary" id="welcome-import" disabled>Import .zip project</button>
+          <div class="welcome-actions">
+            <button class="btn primary" id="welcome-import" disabled>Import .zip project</button>
+            <button class="btn" id="welcome-link" disabled>Open folder…</button>
+          </div>
 
           <h2>Recent projects</h2>
           <ul class="recent" id="recent-projects">
@@ -127,10 +135,11 @@
             <dt><kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>Save all files and compile</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd></dt><dd>Bold / italic / underline (toolbar above the editor)</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>M</kbd></dt><dd>Inline math $…$</dd>
-            <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></dt><dd>Add a web reference ([1] button)</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></dt><dd>Add a reference ([1] button)</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></dt><dd>Show or hide the file tree</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>J</kbd></dt><dd>Show or hide the problems panel</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>O</kbd></dt><dd>Import a .zip project</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd></dt><dd>Open a project folder in place</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd></dt><dd>Open a recent project</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>W</kbd></dt><dd>Close the current tab</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>Tab</kbd></dt><dd>Next tab</dd>
@@ -211,7 +220,7 @@
 
   <div class="drop-overlay" id="drop-overlay" hidden>
     <div class="drop-target">
-      <strong>Drop a .zip to import it as a project</strong>
+      <strong>Drop a .zip to import it, or a folder to open it as a project</strong>
       <span>or drop images, .bib or .tex files to add them to the open project</span>
     </div>
   </div>
