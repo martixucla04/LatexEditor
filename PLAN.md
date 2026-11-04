@@ -114,17 +114,26 @@ latexeditor/
 Runs in a background thread; a new compile cancels a running one; whole build has a timeout.
 
 ```
-lualatex -synctex=1 -interaction=nonstopmode -file-line-error -halt-on-error=no
-         -output-directory=.build main.tex
-  if .build/main.bcf exists               -> biber   (biblatex)
-  elif main.aux contains \bibdata         -> bibtex  (classic)
-  if .glo/.acn present                    -> makeglossaries-lite
-  if .idx present                         -> makeindex
-  re-run lualatex while the log says "Rerun" / aux file changed (max 4 runs total)
+(cwd = project root, env max_print_line=10000 for unwrapped log lines)
+lualatex -interaction=nonstopmode -file-line-error -synctex=1
+         -output-directory=.build -jobname=main main.tex
+  if .build/main.bcf exists               -> biber .build/main             (biblatex)
+  elif main.aux contains \bibdata         -> bibtex .build/main            (classic)
+  if .glo/.acn/.slo present               -> makeglossaries-lite main      (cwd = .build: it can't chdir)
+  if .idx present                         -> makeindex .build/main.idx
+  if .nlo present                         -> makeindex -s nomencl.ist      (nomencl)
+  re-run lualatex after aux tools and while the log asks for a rerun (max 5 runs total)
 ```
 
-- Auxiliary tools only run when their inputs changed (hash of `.bcf`, `.aux` bib lines, `.glo`, `.idx`),
-  so most Ctrl+S builds are a single LuaLaTeX run.
+Verified on this machine: biber/bibtex find `.bib` files relative to the project root,
+non-ASCII project paths compile, and MiKTeX honours the `max_print_line` environment
+variable (it rejects the `--max-print-line` flag).
+
+- Auxiliary tools only run when their inputs changed (hash of `.bcf` + the `.bib` files it
+  lists, `.aux` citations + `.bib` files, `.glo`/`.acn`, `.idx`), stored in
+  `.build/.latexeditor-build.json`, so most Ctrl+S builds are a single LuaLaTeX run.
+- `compile()` blocks in its bridge thread and returns the result; a new compile cancels the
+  running one (process tree killed with `taskkill /T`), and builds never overlap.
 - `TEXINPUTS`/`BIBINPUTS` set so files in subfolders and `.build` are found.
 - `--shell-escape` is never passed in v1.
 - MiKTeX "install missing packages on the fly" can show a dialog; the app detects a stalled
@@ -181,7 +190,7 @@ Each phase ends with something runnable and is tested before moving on.
 | 0 | **Setup** ✅ | `git init`, venv, `requirements.txt` / `requirements-dev.txt`, `fetch_vendor.py` downloads Monaco + PDF.js + typo.js + dictionaries, `smoke_test.py` passes |
 | 1 | **Window & layout** ✅ | App opens a window with file tree · editor · PDF, draggable splitters, toolbar, status bar; `ui_check.py` passes |
 | 2 | **Projects** ✅ | Import `.zip`, workspace folder, Recent Projects, file tree (open/new/rename/delete to Recycle Bin/add files), tabs, Ctrl+S save, Export `.zip`, main-file detection, unsaved-changes guard on quit |
-| 3 | **Compile & PDF** | Build pipeline with LuaLaTeX + biber/BibTeX + glossaries/index; PDF shown on the right, keeps page/zoom after recompile; zoom/fit controls |
+| 3 | **Compile & PDF** ✅ | Build pipeline with LuaLaTeX + biber/BibTeX + glossaries/index (aux tools only when their inputs change); Ctrl+S saves and compiles, Compile/Stop button, progress in the status bar, raw log tab; PDF shown on the right, keeps zoom/scroll after recompile; zoom/fit controls, Ctrl+wheel |
 | 4 | **Error panel** | Parsed errors/warnings, markers in editor, click-to-jump, raw log view |
 | 5 | **Editor intelligence** | LaTeX highlighting, autocomplete (commands, envs, refs, cites, paths), snippets |
 | 6 | **SyncTeX** | Both directions working on multi-file projects |

@@ -4,7 +4,8 @@
 import { call, BackendUnavailable } from "./bridge.js";
 import * as editor from "./editor.js";
 import { FileTree } from "./filetree.js";
-import { initLayout, toggleSidebar, togglePanel } from "./layout.js";
+import { initLayout, showPanel, toggleSidebar, togglePanel } from "./layout.js";
+import { clearPdf, showPdf } from "./pdfview.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
@@ -12,6 +13,8 @@ const dirname = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("
 const basename = (path) => path.split("/").pop();
 
 let project = null; // project info from Python (name, root, main_file, tree, ...)
+let building = false;
+let buildRequest = 0; // id of the latest compile request; older results are ignored
 
 export function setStatus(text, kind = "") {
   const el = $("status-message");
@@ -31,6 +34,7 @@ function setProjectUi(info) {
   name.classList.toggle("open", open);
   name.disabled = !open;
   $("btn-export").disabled = !open;
+  $("btn-compile").disabled = !open;
   for (const id of ["btn-new-file", "btn-new-folder", "btn-add-files"]) $(id).disabled = !open;
   $("welcome").hidden = open;
   editor.setProjectOpen(open);
@@ -52,12 +56,21 @@ async function showProject(info) {
   tree.expanded.clear();
   project = info;
   setProjectUi(info);
+  setBuildLog(null);
+  clearPdf();
   tree.setTree(info.tree, info.main_file);
   if (!info.main_file) await chooseMainFile(info.main_candidates);
   if (project.main_file) {
     await openFile(project.main_file);
   }
   setStatus("Ready");
+  // Show the PDF from the last session's build right away.
+  try {
+    const url = await call("current_pdf");
+    if (url) await showPdf(url);
+  } catch (err) {
+    showError(err);
+  }
 }
 
 async function importZip() {
@@ -93,6 +106,9 @@ async function closeProject() {
   project = null;
   tree.setTree([], null);
   setProjectUi(null);
+  setBuilding(false);
+  setBuildLog(null);
+  clearPdf();
   renderRecent();
 }
 
@@ -195,6 +211,88 @@ async function saveAll() {
   }
   setStatus(files.length === 1 ? `Saved ${basename(files[0].path)}` : `Saved ${files.length} files`);
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Compiling
+// ---------------------------------------------------------------------------
+
+const TOOL_LABELS = {
+  lualatex: "Running LuaLaTeX",
+  biber: "Running biber (bibliography)",
+  bibtex: "Running BibTeX (bibliography)",
+  "makeglossaries-lite": "Building glossaries",
+  makeindex: "Building the index",
+};
+
+function setBuilding(on) {
+  building = on;
+  const button = $("btn-compile");
+  button.classList.toggle("building", on);
+  $("compile-label").textContent = on ? "Stop" : "Compile";
+  button.title = on ? "Stop compiling" : "Save and compile with LuaLaTeX (Ctrl+S)";
+}
+
+function setBuildLog(text) {
+  $("log-text").textContent = text || "";
+  $("log-text").hidden = !text;
+  $("log-empty").hidden = !!text;
+}
+
+// Progress pushed from Python while a build runs (app/api.py _emit).
+window.onBuildEvent = (event) => {
+  if (!building) return;
+  if (event.type === "step") {
+    const runs = event.tool === "lualatex" && event.run > 0 ? ` (run ${event.run + 1})` : "";
+    setStatus(`${TOOL_LABELS[event.tool] || `Running ${event.tool}`}${runs}…`);
+  } else if (event.type === "slow") {
+    setStatus(`Still running ${event.tool}… If MiKTeX shows a package-install dialog, answer it.`, "warning");
+  }
+};
+
+async function compile() {
+  if (!project) return;
+  if (!(await saveAll())) return;
+  const request = ++buildRequest;
+  setBuilding(true);
+  setStatus("Compiling…");
+  try {
+    const result = await call("compile");
+    if (request !== buildRequest) return; // a newer compile replaced this one
+    if (result.status === "cancelled") {
+      setStatus("Compile stopped");
+      return;
+    }
+    setBuildLog(result.log);
+    const kind = { success: "success", errors: "warning", failed: "error" }[result.status];
+    setStatus(result.message, kind);
+    if (result.pdf_url) {
+      project.has_pdf = true;
+      await showPdf(result.pdf_url);
+    }
+    if (result.status === "failed") {
+      showPanel("log");
+      toast(`${result.message}. See the Log tab for details.`, "error", 8000);
+    }
+  } catch (err) {
+    if (request === buildRequest) {
+      setStatus("Compile failed", "error");
+      showError(err);
+    }
+  } finally {
+    if (request === buildRequest) setBuilding(false);
+  }
+}
+
+async function onCompileButton() {
+  if (building) {
+    buildRequest++; // the running call will come back as cancelled
+    setBuilding(false);
+    setStatus("Compile stopped");
+    await call("cancel_build").catch(showError);
+  } else {
+    await compile();
+  }
 }
 
 async function exportZip() {
@@ -343,6 +441,7 @@ function initToolbar() {
   $("btn-import").addEventListener("click", importZip);
   $("welcome-import").addEventListener("click", importZip);
   $("btn-save").addEventListener("click", saveAll);
+  $("btn-compile").addEventListener("click", onCompileButton);
   $("btn-export").addEventListener("click", exportZip);
   $("btn-new-file").addEventListener("click", () => newItem(tree.find(tree.selected), "file"));
   $("btn-new-folder").addEventListener("click", () => newItem(tree.find(tree.selected), "folder"));
@@ -356,26 +455,12 @@ function initToolbar() {
   });
 }
 
-function initPanelTabs() {
-  const tabs = document.querySelectorAll(".panel-tab");
-  for (const tab of tabs) {
-    tab.addEventListener("click", () => {
-      for (const t of tabs) {
-        const active = t === tab;
-        t.classList.toggle("active", active);
-        t.setAttribute("aria-selected", active);
-        document.querySelector(`[data-panel-body="${t.dataset.panel}"]`).hidden = !active;
-      }
-    });
-  }
-}
-
 function initShortcuts() {
   const ctrl = {
     b: toggleSidebar,
     j: togglePanel,
     o: importZip,
-    s: () => project && saveAll(),
+    s: compile,
     w: () => editor.getActivePath() && editor.closeTab(editor.getActivePath()),
     r: () => {}, // no page reload: it would drop unsaved edits
   };
@@ -435,7 +520,6 @@ async function showAppInfo() {
 
 async function main() {
   initLayout();
-  initPanelTabs();
   initToolbar();
   initShortcuts();
   setProjectUi(null);

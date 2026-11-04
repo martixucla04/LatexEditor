@@ -26,7 +26,8 @@ python -m venv .venv
 ## Tests
 
 ```powershell
-.\.venv\Scripts\python -m pytest         # unit tests
+.\.venv\Scripts\python -m pytest         # unit tests + real LuaLaTeX builds (~40 s)
+.\.venv\Scripts\python -m pytest -m "not latex"   # skip the LuaLaTeX build tests
 .\.venv\Scripts\python scripts\ui_check.py   # opens the app window, checks layout + backend, closes it
 ```
 

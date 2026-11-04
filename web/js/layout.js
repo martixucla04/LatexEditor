@@ -129,8 +129,26 @@ export function togglePanel() {
   save();
 }
 
+function selectPanelTab(name) {
+  for (const tab of document.querySelectorAll(".panel-tab")) {
+    const active = tab.dataset.panel === name;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", active);
+    document.querySelector(`[data-panel-body="${tab.dataset.panel}"]`).hidden = !active;
+  }
+}
+
+// Bring a bottom-panel tab ("problems" | "log") into view, reopening the panel if hidden.
+export function showPanel(name) {
+  if (!state.panelVisible) togglePanel();
+  selectPanelTab(name);
+}
+
 export function initLayout() {
   load();
+  for (const tab of document.querySelectorAll(".panel-tab")) {
+    tab.addEventListener("click", () => selectPanelTab(tab.dataset.panel));
+  }
   makeSplitter(document.getElementById("split-sidebar"), "sidebar", "x", 1);
   makeSplitter(document.getElementById("split-pdf"), "pdf", "x", -1);
   makeSplitter(document.getElementById("split-panel"), "panel", "y", -1);

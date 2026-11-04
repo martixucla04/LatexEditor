@@ -5,18 +5,22 @@ state is kept in underscore-prefixed attributes. Each call runs in its own
 thread; exceptions reject the JS promise (UserError messages are shown as-is).
 """
 
+import json
 import platform
 import shutil
 import subprocess
 import sys
+import threading
 from importlib.metadata import version
 from pathlib import Path
 
 import webview
 
 from . import __version__
+from .builder import Builder, BuildResult
 from .errors import UserError
 from .fsutil import reveal_in_explorer
+from .pdfserver import PdfServer
 from .project import Project
 from .settings import Settings
 from .workspace import export_zip, import_zip
@@ -54,6 +58,10 @@ class Api:
         self._settings = settings or Settings()
         self._project: Project | None = None
         self._dirty = False
+        self._pdf_server: PdfServer | None = None
+        self._builder: Builder | None = None
+        self._builder_lock = threading.Lock()  # guards self._builder
+        self._run_lock = threading.Lock()  # one build writes .build at a time
 
     def _attach(self, window):
         """Called by main.py once the window exists."""
@@ -70,7 +78,20 @@ class Api:
             raise UserError("No project is open.")
         return self._project
 
+    def _pdfs(self) -> PdfServer:
+        if self._pdf_server is None:
+            self._pdf_server = PdfServer()
+        return self._pdf_server
+
+    def _emit(self, event: dict):
+        """Push a build progress event to the page (no-op without a real window)."""
+        if self._window is not None:
+            self._window.evaluate_js(f"window.onBuildEvent && window.onBuildEvent({json.dumps(event)})")
+
     def _open(self, root: Path) -> dict:
+        self.cancel_build()
+        if self._pdf_server:
+            self._pdf_server.clear()
         self._project = Project(root)
         self._settings.add_recent(self._project.root, self._project.name)
         if self._window is not None:
@@ -116,6 +137,9 @@ class Api:
         return self._open(Path(path))
 
     def close_project(self):
+        self.cancel_build()
+        if self._pdf_server:
+            self._pdf_server.clear()
         self._project = None
         if self._window is not None:
             self._window.title = "LaTeX Editor"
@@ -171,3 +195,46 @@ class Api:
         project = self._require_project()
         project.set_main_file(rel)
         return project.info()
+
+    # -- building ------------------------------------------------------------------
+
+    def compile(self):
+        """Build the main file and return the result (blocks until done).
+
+        Starting a new build cancels the running one; the cancelled call
+        returns status "cancelled".
+        """
+        project = self._require_project()
+        main = project.main_file
+        if not main:
+            raise UserError("No main file is set. Right-click a .tex file and choose \"Set as main file\".")
+        if shutil.which("lualatex") is None:
+            raise UserError("LuaLaTeX was not found. Install MiKTeX and make sure lualatex is on the PATH.")
+
+        builder = Builder(project.root, main, on_event=self._emit)
+        with self._builder_lock:
+            previous, self._builder = self._builder, builder
+        if previous is not None:
+            previous.cancel()
+        with self._run_lock:
+            if self._builder is not builder:  # superseded while waiting for the previous build
+                return BuildResult("cancelled", "Build cancelled").to_dict()
+            result = builder.run()
+        with self._builder_lock:
+            if self._builder is builder:
+                self._builder = None
+
+        data = result.to_dict()
+        data["pdf_url"] = self._pdfs().publish(Path(result.pdf)) if result.pdf else None
+        return data
+
+    def cancel_build(self):
+        with self._builder_lock:
+            builder = self._builder
+        if builder is not None:
+            builder.cancel()
+
+    def current_pdf(self):
+        """URL of the PDF from the last build of this project, if there is one."""
+        pdf = self._require_project().pdf_path
+        return self._pdfs().publish(pdf) if pdf and pdf.is_file() else None

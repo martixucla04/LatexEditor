@@ -2,8 +2,9 @@
 
 Uses a temporary settings file and workspace (your real recent-projects list is
 not touched). Checks that the page loads inside pywebview, the Python API
-answers, the layout has sensible sizes, and that a project imported from a
-.zip opens from the Recent list with its file tree and main file in a tab.
+answers, the layout has sensible sizes, that a project imported from a .zip
+opens from the Recent list with its file tree and main file in a tab, and that
+Compile runs LuaLaTeX and shows the PDF.
 Prints the findings as JSON and exits non-zero if a check fails.
 
 Usage:  .venv\\Scripts\\python scripts/ui_check.py
@@ -50,6 +51,16 @@ PROJECT_PROBE = """
 }))()
 """
 
+BUILD_PROBE = """
+(() => ({
+  building: document.getElementById("btn-compile").classList.contains("building"),
+  status: document.getElementById("status-message").textContent,
+  pages: document.getElementById("page-indicator").textContent,
+  renderedPages: document.querySelectorAll("#pdf-pages .page[data-loaded]").length,
+  pdfText: document.querySelector("#pdf-pages .textLayer")?.textContent || "",
+}))()
+"""
+
 DOC = "\\documentclass{article}\n\\begin{document}\nHello\n\\input{sec/intro}\n\\end{document}\n"
 
 
@@ -75,6 +86,11 @@ def check(window, api, zip_path, results):
     wait_for(window, LAYOUT_PROBE, lambda v: v["recent"])
     window.evaluate_js('document.querySelector(".recent-item").click()')
     results["project"] = wait_for(window, PROJECT_PROBE, lambda v: v["tabs"] and v["editorLines"])
+
+    window.evaluate_js('document.getElementById("btn-compile").click()')
+    time.sleep(0.5)
+    results["build"] = wait_for(window, BUILD_PROBE,
+                                lambda v: not v["building"] and v["renderedPages"] and v["pdfText"], timeout=120)
     window.destroy()
 
 
@@ -92,13 +108,15 @@ def main():
         run(func=check, args=(api, zip_path, results), api=api)
 
     print(json.dumps(results, indent=2, ensure_ascii=False))
-    layout, project = results.get("layout", {}), results.get("project", {})
+    layout, project, build = results.get("layout", {}), results.get("project", {}), results.get("build", {})
     checks = {
         "engine detected": layout.get("engineState") == "engine-line ok",
         "layout sizes": layout.get("sidebar", 0) > 0 and layout.get("editor", 0) >= 320 and layout.get("pdf", 0) >= 280,
         "tree shows project": project.get("rows") == ["sec", "main.tex"],
         "main file marked": project.get("main") == "main.tex",
         "main file open in editor": project.get("tabs") == ["main.tex"] and project.get("editorLines", 0) >= 5,
+        "compiles": build.get("status", "").startswith("Compiled in"),
+        "PDF shown": build.get("pages") == "1 / 1" and "Hello" in build.get("pdfText", "") and "Intro" in build.get("pdfText", ""),
     }
     for name, ok in checks.items():
         print(f"  {'PASS' if ok else 'FAIL'}  {name}")

@@ -188,6 +188,16 @@ code, kbd { font-family: var(--font-mono); font-size: 0.92em; }
 
 .tb-btn.primary:hover:not(:disabled) { background: var(--compile-hover); }
 
+/* While building, the Compile button becomes a Stop button with a spinner. */
+.tb-btn .icon-spin { display: none; animation: spin 0.8s linear infinite; }
+.tb-btn.building .icon-spin { display: inline; }
+.tb-btn.building .icon-play { display: none; }
+.tb-btn.primary.building { background: var(--text-muted); }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* ---------------------------------------------------------------------
@@ -471,6 +481,17 @@ kbd {
 .panel-tab.active .badge { background: var(--border); }
 .pane-body.log { font: 12px/1.5 var(--font-mono); user-select: text; }
 
+.log-text {
+  margin: 0;
+  padding: 8px 12px;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.statusbar .success { color: var(--compile); }
+.statusbar .error { color: var(--danger); }
+
 .editor-column.panel-hidden .panel,
 .editor-column.panel-hidden #split-panel { display: none; }
 
@@ -481,13 +502,23 @@ kbd {
 .page-indicator, .zoom-value { min-width: 44px; color: var(--text-muted); font-size: 12px; text-align: center; }
 
 .pdf-viewer {
+  position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
   background: var(--surface-alt);
-  display: grid;
-  place-items: center;
 }
+
+/* PDF.js requires an absolutely positioned scroll container. */
+.pdf-container { position: absolute; inset: 0; overflow: auto; }
+.pdf-empty { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+
+.pdfViewer {
+  --page-margin: 12px auto;
+  --page-border: none;
+  padding-bottom: 12px;
+}
+
+.pdfViewer .page { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
 
 /* ---------------------------------------------------------------------
    File tree
