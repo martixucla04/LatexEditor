@@ -123,6 +123,10 @@ export function toggleSidebar() {
   save();
 }
 
+export function ensureSidebar() {
+  if (!state.sidebarVisible) toggleSidebar();
+}
+
 export function togglePanel() {
   state.panelVisible = !state.panelVisible;
   apply();

@@ -53,8 +53,12 @@
   <main class="workbench" id="workbench">
     <aside class="sidebar" id="sidebar">
       <div class="pane-header">
-        <span class="pane-title">Files</span>
+        <div class="sidebar-tabs" role="tablist">
+          <button class="sidebar-tab active" data-view="files" role="tab" aria-selected="true">Files</button>
+          <button class="sidebar-tab" data-view="search" role="tab" aria-selected="false" title="Search in the project (Ctrl+Shift+F)">Search</button>
+        </div>
         <div class="spacer"></div>
+        <div class="tb-group" id="file-actions">
         <button class="tb-btn icon-only small" id="btn-new-file" disabled title="New file">
           <svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M12 11v6M9 14h6"/></svg>
         </button>
@@ -64,9 +68,30 @@
         <button class="tb-btn icon-only small" id="btn-add-files" disabled title="Add files from your computer (images, .bib, …)">
           <svg viewBox="0 0 24 24"><path d="M12 16V4m-4 4 4-4 4 4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>
         </button>
+        </div>
       </div>
-      <div class="pane-body" id="file-tree">
+      <div class="pane-body" id="file-tree" data-view-body="files">
         <p class="empty-state">No project open.</p>
+      </div>
+      <div class="search-view" id="search-view" data-view-body="search" hidden>
+        <div class="search-form">
+          <div class="search-field">
+            <input type="text" id="search-input" placeholder="Search" spellcheck="false" aria-label="Search">
+            <button class="toggle" id="search-case" aria-pressed="false" title="Match case">Aa</button>
+            <button class="toggle" id="search-word" aria-pressed="false" title="Whole word"><u>ab</u></button>
+            <button class="toggle" id="search-regex" aria-pressed="false" title="Regular expression">.*</button>
+          </div>
+          <div class="search-field">
+            <input type="text" id="replace-input" placeholder="Replace" spellcheck="false" aria-label="Replace">
+            <button class="toggle" id="btn-replace-all" title="Replace all">
+              <svg viewBox="0 0 24 24"><path d="M4 7h11l-3-3M20 17H9l3 3"/></svg>
+            </button>
+          </div>
+          <input type="text" id="search-include" class="search-include" spellcheck="false"
+                 aria-label="Files to include" title="Files to include (comma-separated patterns)">
+        </div>
+        <div class="search-summary" id="search-summary"></div>
+        <div class="pane-body search-results" id="search-results"></div>
       </div>
     </aside>
 
@@ -95,6 +120,8 @@
             <dt><kbd>Ctrl</kbd>+<kbd>O</kbd></dt><dd>Import a .zip project</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>W</kbd></dt><dd>Close the current tab</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>Tab</kbd></dt><dd>Next tab</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>F</kbd> / <kbd>Ctrl</kbd>+<kbd>H</kbd></dt><dd>Find / replace in the current file</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></dt><dd>Search and replace in the whole project</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd></dt><dd>Show the cursor's line in the PDF</dd>
             <dt>Double-click PDF</dt><dd>Jump to that place in the source</dd>
           </dl>

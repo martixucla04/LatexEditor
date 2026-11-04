@@ -316,6 +316,37 @@ export function focusEditor() {
   if (tabs.get(activePath)?.kind === "text") editor.focus();
 }
 
+// Selected text in the active file (single line only), for pre-filling the search box.
+export function selectionText() {
+  if (tabs.get(activePath)?.kind !== "text") return "";
+  const text = editor.getModel().getValueInRange(editor.getSelection());
+  return text.includes("\n") ? "" : text;
+}
+
+// Select `length` characters at line:column of the active file and scroll there.
+export function selectRange(line, column, length) {
+  const model = editor.getModel();
+  if (!model) return;
+  const range = new monaco.Range(line, column, line, column + length);
+  editor.setSelection(range);
+  editor.revealRangeInCenterIfOutsideViewport(range);
+  editor.focus();
+}
+
+// Replace an open tab's content with what is now on disk (after a project-wide replace).
+// Done as an edit, so Ctrl+Z still undoes it in the editor.
+export function reloadFile(path, data) {
+  const tab = tabs.get(path);
+  if (!tab?.model || data.kind !== "text" || tab.model.getValue() === data.text) return;
+  tab.model.pushStackElement(); // its own undo step, separate from earlier typing
+  tab.model.pushEditOperations([], [{ range: tab.model.getFullModelRange(), text: data.text }], () => null);
+  tab.model.pushStackElement();
+  tab.savedVersion = tab.model.getAlternativeVersionId();
+  tab.encoding = data.encoding;
+  renderTabs();
+  notifyDirty();
+}
+
 // Cursor of the active text file: { path, line, column } or null.
 export function cursor() {
   const tab = tabs.get(activePath);

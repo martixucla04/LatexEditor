@@ -92,6 +92,22 @@ window.__editorProbe = null;
   const ed = monaco.editor.getEditors()[0];
   const model = ed.getModel();
   const tokens = monaco.editor.tokenize("\\\\section{A} $x^2$ % c", "latex")[0].map((t) => t.type);
+  // Lines that once crashed the tokenizer (optional groups in the \\cite rule)
+  let tokenizerError = null;
+  try {
+    monaco.editor.tokenize("\\\\cite{a} \\\\parencite[p.~2]{b} \\\\textcite[see][]{c}\\n\\\\begin{align}x&=1\\\\end{align}", "latex");
+    monaco.editor.tokenize("@article{k, title={A {B} C}, year=2020}", "bibtex");
+  } catch (e) {
+    tokenizerError = String(e);
+  }
+  // Project search: Ctrl+Shift+F, type, wait for results
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "F", code: "KeyF", ctrlKey: true, shiftKey: true, bubbles: true }));
+  const search = document.getElementById("search-input");
+  search.value = "intro";
+  search.dispatchEvent(new Event("input"));
+  await sleep(1500);
+  const searchSummary = document.getElementById("search-summary").textContent;
+  document.querySelector('.sidebar-tab[data-view="files"]').click();
   // type "\\ref{" at the end and read the suggestion list
   ed.focus();
   ed.setPosition({ lineNumber: 3, column: model.getLineMaxColumn(3) });
@@ -101,7 +117,7 @@ window.__editorProbe = null;
     .map((r) => r.getAttribute("aria-label").split(",")[0]);
   ed.trigger("keyboard", "hideSuggestWidget", {});
   ed.trigger("keyboard", "undo", {});
-  window.__editorProbe = { language: model.getLanguageId(), tokens, suggestions };
+  window.__editorProbe = { language: model.getLanguageId(), tokens, tokenizerError, searchSummary, suggestions };
 })();
 """
 
@@ -170,7 +186,10 @@ def main():
         "PDF shown": build.get("pages") == "1 / 1" and "Hello" in build.get("pdfText", "") and "Intro" in build.get("pdfText", ""),
         "no problems reported": build.get("problemBadge") == "0" and build.get("problemsEmpty") == "No problems in the last build.",
         "LaTeX highlighting": editor.get("language") == "latex"
-            and {"keyword.section.latex", "math.latex", "comment.latex"} <= set(editor.get("tokens", [])),
+            and {"keyword.section.latex", "math.latex", "comment.latex"} <= set(editor.get("tokens", []))
+            and editor.get("tokenizerError") is None,
+        # \input{sec/intro} in main.tex; "Intro" and sec:intro in sec/intro.tex (case-insensitive)
+        "project search": editor.get("searchSummary") == "3 results in 2 files",
         "\\ref autocomplete": editor.get("suggestions") == ["sec:intro"],
         "SyncTeX source -> PDF -> source": results.get("synctex") == {"flash": True, "file": "main.tex", "line": 3},
     }

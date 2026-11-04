@@ -16,7 +16,8 @@ const latexTokens = {
       [/(\\(?:part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\*?)(?=[{[])/, "keyword.section"],
       [/(\\(?:label|ref|eqref|autoref|cref|Cref|pageref|nameref|vref))(\{)([^}]*)(\})/,
         ["keyword.ref", "delimiter.curly", "string.ref", "delimiter.curly"]],
-      [/(\\(?:cite[a-zA-Z]*|[pPtT]extcite|parencite|[aA]utocite|footcite|nocite|fullcite|Cite[a-zA-Z]*))(\[[^\]]*\])?(\[[^\]]*\])?(\{)([^}]*)(\})/,
+      // Optional [..] groups must still participate in the match (Monarch fails on unset groups).
+      [/(\\(?:cite[a-zA-Z]*|[pPtT]extcite|parencite|[aA]utocite|footcite|nocite|fullcite|Cite[a-zA-Z]*))((?:\[[^\]]*\])?)((?:\[[^\]]*\])?)(\{)([^}]*)(\})/,
         ["keyword.ref", "string.option", "string.option", "delimiter.curly", "string.ref", "delimiter.curly"]],
       [/\\\[/, { token: "delimiter.math", next: "@displaymath" }],
       [/\\\(/, { token: "delimiter.math", next: "@parenmath" }],

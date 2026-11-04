@@ -8,6 +8,7 @@ import { initLayout, showPanel, toggleSidebar, togglePanel } from "./layout.js";
 import { setProjectData } from "./completion.js";
 import { clearPdf, highlightBoxes, onInverseSearch, showPdf } from "./pdfview.js";
 import { counts as problemCounts, initProblems, setProblems } from "./problems.js";
+import { initSearch, setSearchProject, showSearch, showSidebarView } from "./search.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
@@ -41,6 +42,8 @@ function setProjectUi(info) {
   for (const id of ["btn-new-file", "btn-new-folder", "btn-add-files"]) $(id).disabled = !open;
   $("welcome").hidden = open;
   editor.setProjectOpen(open);
+  setSearchProject(open);
+  if (!open) showSidebarView("files");
   document.title = open ? `${info.name} - LaTeX Editor` : "LaTeX Editor";
 }
 
@@ -547,6 +550,12 @@ function initShortcuts() {
       event.preventDefault();
       return;
     }
+    if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyF") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (project) showSearch(editor.selectionText());
+      return;
+    }
     if (event.ctrlKey && event.altKey && !event.shiftKey && event.code === "KeyJ") {
       event.preventDefault();
       event.stopPropagation();
@@ -603,6 +612,19 @@ async function showAppInfo() {
 async function main() {
   initLayout();
   initProblems({ onOpen: openProblem });
+  initSearch({
+    onOpenMatch: async (file, line, column, length) => {
+      await openFile(file);
+      if (editor.getActivePath() === file) editor.selectRange(line, column, length);
+    },
+    beforeReplace: saveAll,
+    afterReplace: async (files) => {
+      for (const file of files.filter(editor.isOpen)) {
+        editor.reloadFile(file, await call("read_file", file));
+      }
+      refreshCompletionData();
+    },
+  });
   initToolbar();
   initShortcuts();
   setProjectUi(null);

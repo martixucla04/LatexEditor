@@ -83,7 +83,7 @@ latexeditor/
       pdfview.js     # PDF.js viewer, zoom, keep scroll on reload
       problems.js    # problems panel (markers live in editor.js)
       synctex.js
-      search.js      # project find/replace panel
+      search.js      # sidebar Search view (project find/replace)
       spell/         # spell-check worker
     smoke.html       # dev-only page for scripts/smoke_test.py
     vendor/          # monaco, pdfjs, typo, dictionaries (fetched, not hand-edited)
@@ -177,9 +177,13 @@ ignores the `max_print_line` env var and `--cnf-line`), so the log parser unwrap
 
 ### 4.7 Find / replace in project
 
-- Panel with: text or regex, match case, whole word, file filter (`*.tex`, `*.bib`).
-- Results grouped by file with line previews; click to jump.
-- "Replace all" shows a preview of affected lines and saves the files (open tabs updated).
+- Sidebar view next to Files: text or regex, match case, whole word, file patterns (`*.tex, *.bib`).
+- Matching is per line; literal by default (LaTeX backslashes need no escaping); regex
+  replacements accept `$1` or `\1`. "Whole word" only adds boundaries next to letters/digits,
+  so `\section` doesn't match `\sectionmark`.
+- Results grouped by file with highlighted previews; click opens the file with the match selected.
+- "Replace all" asks for confirmation, saves open files, rewrites files in their original
+  encoding and line endings, and updates open tabs as one undoable edit.
 
 ### 4.8 Spell check
 
@@ -203,7 +207,7 @@ Each phase ends with something runnable and is tested before moving on.
 | 4 | **Error panel** ✅ | Parsed errors/warnings with filters and badge, squiggles in the editor (F8 = next problem), click-to-jump, raw log view, problems restored when a project is reopened |
 | 5 | **Editor intelligence** ✅ | LaTeX + BibTeX highlighting (math, refs, sections), autocomplete (commands, envs with snippets, `\end{` closes the open env, refs incl. unsaved labels, cites with author/year/title, files, packages, user macros), hover on `\ref`/`\cite`, folding, Ctrl+/ |
 | 6 | **SyncTeX** ✅ | Ctrl+Alt+J / "Find in PDF" highlights the cursor's line in the PDF; double-click in the PDF opens the source line (with a flash); multi-file and accented paths |
-| 7 | **Find/replace in project** | Search panel with regex, replace-all with preview |
+| 7 | **Find/replace in project** ✅ | Sidebar Search view (Ctrl+Shift+F): literal/regex, case, whole word, file patterns; results grouped by file, click selects the match; Replace all with confirmation, saves open files first, open tabs updated (undoable); Monaco Ctrl+F/Ctrl+H in the current file |
 | 8 | **Spell check** | English dictionary, suggestions, project dictionary |
 | 9 | **Polish & package** | Light/dark theme, settings dialog (font size, dictionary, workspace path), unsaved-changes prompts, `LatexEditor.exe` via PyInstaller |
 

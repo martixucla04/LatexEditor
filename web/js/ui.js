@@ -40,12 +40,23 @@ function openDialog({ title, body, okLabel = "OK", danger = false, cancelLabel =
   ]);
   dialog.append(form);
   document.body.append(dialog);
-  cancel.addEventListener("click", () => dialog.close("cancel"));
 
+  // Resolve straight from submit / Cancel / Escape rather than the "close" event,
+  // whose dispatch can be delayed (it never arrived in some embedded browsers).
   const done = new Promise((resolve) => {
-    dialog.addEventListener("close", () => {
-      resolve(dialog.returnValue === "ok");
+    const finish = (accepted) => {
+      resolve(accepted);
+      if (dialog.open) dialog.close();
       dialog.remove();
+    };
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (form.reportValidity()) finish(true);
+    });
+    cancel.addEventListener("click", () => finish(false));
+    dialog.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      finish(false);
     });
   });
   dialog.showModal();

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from . import __version__, synctex
+from . import __version__, search, synctex
 from .builder import Builder, BuildResult
 from .completions import scan_project
 from .errors import UserError
@@ -210,6 +210,19 @@ class Api:
         """Source location of a point in the PDF: {file, line} or None."""
         project, pdf = self._synctex_pdf()
         return synctex.inverse(project.root, pdf, int(page), float(x), float(y))
+
+    def search_project(self, query: str, options: dict | None = None):
+        """Find text in project files. options: regex, case, word (bools), include (globs)."""
+        o = options or {}
+        return search.search(self._require_project(), query, bool(o.get("regex")), bool(o.get("case")),
+                             bool(o.get("word")), o.get("include") or search.DEFAULT_INCLUDE)
+
+    def replace_in_project(self, query: str, replacement: str, options: dict | None = None, files=None):
+        """Replace all matches in `files` (paths from a search). Returns {files, count}."""
+        o = options or {}
+        return search.replace(self._require_project(), query, replacement, bool(o.get("regex")),
+                              bool(o.get("case")), bool(o.get("word")),
+                              o.get("include") or search.DEFAULT_INCLUDE, files)
 
     def completion_data(self):
         """Labels, bibliography entries, user macros and files for autocomplete."""
