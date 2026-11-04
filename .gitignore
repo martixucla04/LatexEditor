@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Packaging
+build/
+dist/
+*.spec
+
+# Third-party JS fetched by scripts/fetch_vendor.py
+web/vendor/
+
+# LaTeX build output
+.build/

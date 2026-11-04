@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- Dev-only page used by scripts/smoke_test.py to check that the vendored
+     libraries load inside the pywebview window. Not part of the app UI. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Smoke test</title>
+  <style>
+    html, body { margin: 0; height: 100%; font: 13px system-ui, sans-serif; }
+    #panes { display: flex; height: calc(100% - 24px); }
+    #editor, #pdf { flex: 1; overflow: auto; }
+    #status { height: 24px; line-height: 24px; padding: 0 8px; background: #eee; }
+  </style>
+</head>
+<body>
+  <div id="panes"><div id="editor"></div><div id="pdf"><canvas id="page"></canvas></div></div>
+  <div id="status">Running smoke test...</div>
+
+  <script src="vendor/monaco/vs/loader.js"></script>
+  <script src="vendor/typo/typo.js"></script>
+  <script type="module">
+    import * as pdfjsLib from "./vendor/pdfjs/build/pdf.min.mjs";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdfjs/build/pdf.worker.min.mjs";
+
+    const report = {};
+
+    async function check(name, fn) {
+      try {
+        report[name] = { ok: true, detail: await fn() };
+      } catch (err) {
+        report[name] = { ok: false, detail: String(err && err.stack || err) };
+      }
+    }
+
+    function loadMonaco() {
+      return new Promise((resolve, reject) => {
+        require.config({ paths: { vs: "vendor/monaco/vs" } });
+        require(["vs/editor/editor.main"], () => resolve(window.monaco), reject);
+      });
+    }
+
+    async function run() {
+      const source = await window.pywebview.api.get_source();
+
+      await check("monaco", async () => {
+        const monaco = await loadMonaco();
+        const editor = monaco.editor.create(document.getElementById("editor"), {
+          value: source, language: "plaintext", automaticLayout: true,
+        });
+        return `editor created, ${editor.getModel().getLineCount()} lines`;
+      });
+
+      await check("typo", async () => {
+        const [aff, dic] = await Promise.all([
+          fetch("vendor/dictionaries/en/index.aff").then(r => r.text()),
+          fetch("vendor/dictionaries/en/index.dic").then(r => r.text()),
+        ]);
+        const typo = new Typo("en_US", aff, dic);
+        const good = typo.check("research"), bad = typo.check("reserch");
+        if (!good || bad) throw new Error(`unexpected results good=${good} bad=${bad}`);
+        return `check ok, suggestions for 'reserch': ${typo.suggest("reserch").join(", ")}`;
+      });
+
+      await check("pdfjs", async () => {
+        const b64 = await window.pywebview.api.get_pdf();
+        const data = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const pdf = await pdfjsLib.getDocument({
+          data,
+          cMapUrl: "vendor/pdfjs/cmaps/",
+          standardFontDataUrl: "vendor/pdfjs/standard_fonts/",
+          wasmUrl: "vendor/pdfjs/wasm/",
+        }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1.2 });
+        const canvas = document.getElementById("page");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvas, viewport }).promise;
+        const text = (await page.getTextContent()).items.map(i => i.str).join(" ");
+        return `${pdf.numPages} page(s), text: ${text.slice(0, 80)}`;
+      });
+
+      document.getElementById("status").textContent =
+        Object.entries(report).map(([k, v]) => `${k}: ${v.ok ? "OK" : "FAIL"}`).join(" | ");
+      await window.pywebview.api.report(report);
+    }
+
+    if (window.pywebview && window.pywebview.api) run();
+    else window.addEventListener("pywebviewready", run);
+  </script>
+</body>
+</html>
