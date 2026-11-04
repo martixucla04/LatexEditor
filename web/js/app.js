@@ -217,6 +217,42 @@ async function setMainFile(path) {
   }
 }
 
+// Toolbar "Recent" menu: switch to a recently opened project without importing again.
+async function showRecentMenu() {
+  let items = [];
+  try {
+    items = await call("recent_projects");
+  } catch (err) {
+    showError(err);
+    return;
+  }
+  const rect = $("btn-recent").getBoundingClientRect();
+  const entries = items.map((item) => ({
+    label: item.name,
+    detail: item.exists ? item.path : "Folder not found",
+    title: item.path,
+    className: `recent-menu-item${project && item.path.toLowerCase() === project.root.toLowerCase() ? " current" : ""}`,
+    disabled: !item.exists,
+    action: () => openProject(item.path),
+  }));
+  if (!entries.length) entries.push({ label: "No recent projects yet", disabled: true, action() {} });
+  contextMenu(rect.left, rect.bottom + 4, [
+    ...entries,
+    "-",
+    { label: "Import .zip…", shortcut: "Ctrl+O", action: () => importZip() },
+  ]);
+}
+
+// At startup, reopen the most recent project (Settings: "Reopen the last project").
+async function reopenLastProject() {
+  try {
+    const [recent] = await call("recent_projects");
+    if (!project && recent?.exists) await openProject(recent.path);
+  } catch (err) {
+    console.warn("reopen last project", err);
+  }
+}
+
 async function renderRecent() {
   const list = $("recent-projects");
   let items = [];
@@ -572,6 +608,7 @@ const tree = new FileTree($("file-tree"), {
 
 function initToolbar() {
   $("btn-import").addEventListener("click", () => importZip());
+  $("btn-recent").addEventListener("click", showRecentMenu);
   $("welcome-import").addEventListener("click", () => importZip());
   initDropOverlay();
   $("btn-save").addEventListener("click", saveAll);
@@ -607,6 +644,12 @@ function initShortcuts() {
     if (document.querySelector("dialog[open]")) return;
     if (event.key === "F5") {
       event.preventDefault();
+      return;
+    }
+    if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyO") {
+      event.preventDefault();
+      event.stopPropagation();
+      showRecentMenu();
       return;
     }
     if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyB") {
@@ -705,11 +748,12 @@ async function main() {
   });
   initFormatBar();
   await Promise.all([showAppInfo(), renderRecent()]);
-  await loadPreferences({
+  const prefs = await loadPreferences({
     onWorkspaceChange: (ws) => {
       if (ws) $("workspace-line").textContent = `Projects are stored in ${ws}`;
     },
   }).catch((err) => console.warn("preferences", err));
+  if (prefs?.reopen_last) await reopenLastProject();
 }
 
 main().catch(showError);

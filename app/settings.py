@@ -11,7 +11,7 @@ MAX_RECENT = 10
 
 THEMES = ("system", "light", "dark")
 FONT_SIZES = range(10, 25)
-DEFAULT_PREFERENCES = {"theme": "system", "font_size": 14, "word_wrap": True}
+DEFAULT_PREFERENCES = {"theme": "system", "font_size": 14, "word_wrap": True, "reopen_last": True}
 
 
 def default_settings_path() -> Path:
@@ -44,6 +44,7 @@ class Settings:
             "theme": self.data["theme"] if self.data.get("theme") in THEMES else "system",
             "font_size": self.data["font_size"] if self.data.get("font_size") in FONT_SIZES else 14,
             "word_wrap": bool(self.data.get("word_wrap", True)),
+            "reopen_last": bool(self.data.get("reopen_last", True)),
             "workspace": self.data["workspace"],
         }
 
@@ -53,8 +54,9 @@ class Settings:
             self.data["theme"] = changes["theme"]
         if changes.get("font_size") in FONT_SIZES:
             self.data["font_size"] = int(changes["font_size"])
-        if isinstance(changes.get("word_wrap"), bool):
-            self.data["word_wrap"] = changes["word_wrap"]
+        for flag in ("word_wrap", "reopen_last"):
+            if isinstance(changes.get(flag), bool):
+                self.data[flag] = changes[flag]
         if changes.get("workspace"):
             path = Path(changes["workspace"])
             path.mkdir(parents=True, exist_ok=True)  # raises if the location is not writable

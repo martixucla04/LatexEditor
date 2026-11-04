@@ -5,6 +5,8 @@
 const STORAGE_KEY = "latexeditor.layout";
 const DEFAULT_PDF_RATIO = 0.45;
 const MIN_EDITOR_W = 320;
+const MIN_SIDEBAR_W = 200; // room for the Files/Search tabs and the three file buttons
+const MAX_SIDEBAR_W = 480;
 const MIN_EDITOR_H = 200;
 const KEY_STEP = 16;
 
@@ -44,7 +46,7 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 // Pixel sizes for the current window, keeping every pane within bounds.
 function measure() {
   const width = workbench.clientWidth;
-  const sidebar = clamp(state.sidebar, 160, Math.max(160, Math.min(480, width / 3)));
+  const sidebar = clamp(state.sidebar, MIN_SIDEBAR_W, Math.max(MIN_SIDEBAR_W, Math.min(MAX_SIDEBAR_W, width / 3)));
   const pdfMax = Math.max(280, width - (state.sidebarVisible ? sidebar : 0) - MIN_EDITOR_W - 10);
   const pdf = clamp(Math.round(width * state.pdfRatio), 280, pdfMax);
   const tabsH = document.getElementById("tabs").offsetHeight;

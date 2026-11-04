@@ -108,7 +108,7 @@ export function closeContextMenu() {
   openMenu = null;
 }
 
-// items: [{ label, action, danger?, disabled?, shortcut? } | "-"]
+// items: [{ label, action, danger?, disabled?, shortcut?, detail? (second line), className?, title? } | "-"]
 export function contextMenu(x, y, items) {
   closeContextMenu();
   const menu = el("div", { className: "context-menu", role: "menu" });
@@ -118,10 +118,14 @@ export function contextMenu(x, y, items) {
       continue;
     }
     const button = el("button", {
-      className: item.danger ? "danger" : "",
+      className: [item.danger ? "danger" : "", item.className || ""].join(" ").trim(),
       disabled: !!item.disabled,
       role: "menuitem",
-    }, [el("span", { textContent: item.label }), el("kbd", { textContent: item.shortcut || "" })]);
+      title: item.title || "",
+    }, [
+      el("span", { textContent: item.label }),
+      item.detail ? el("small", { textContent: item.detail }) : el("kbd", { textContent: item.shortcut || "" }),
+    ]);
     button.addEventListener("click", () => {
       closeContextMenu();
       item.action();

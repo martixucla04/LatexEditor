@@ -6,7 +6,7 @@ import { call } from "./bridge.js";
 import * as editor from "./editor.js";
 import { showError, toast } from "./ui.js";
 
-let prefs = { theme: "system", font_size: 14, word_wrap: true, workspace: "" };
+let prefs = { theme: "system", font_size: 14, word_wrap: true, reopen_last: true, workspace: "" };
 let onWorkspaceChange = () => {};
 
 export function applyPreferences(p) {
@@ -22,6 +22,7 @@ export function applyPreferences(p) {
 export async function loadPreferences(handlers = {}) {
   onWorkspaceChange = handlers.onWorkspaceChange || onWorkspaceChange;
   applyPreferences(await call("get_preferences"));
+  return prefs;
 }
 
 const el = (tag, props = {}, children = []) => {
@@ -48,6 +49,7 @@ export function openSettings() {
   for (let size = 10; size <= 24; size++) fontSize.append(el("option", { value: String(size), textContent: `${size} px` }));
   fontSize.value = String(prefs.font_size);
   const wrap = el("input", { type: "checkbox", checked: prefs.word_wrap });
+  const reopen = el("input", { type: "checkbox", checked: prefs.reopen_last });
   const workspace = el("code", { className: "setting-path", textContent: prefs.workspace });
   const change = el("button", { type: "button", className: "btn", textContent: "Change…" });
 
@@ -78,6 +80,7 @@ export function openSettings() {
     row("Theme", theme),
     row("Editor font size", fontSize),
     row("Wrap long lines", wrap),
+    row("Reopen the last project at startup", reopen, "Otherwise the start page with Recent projects is shown"),
     el("div", { className: "setting-row setting-workspace" }, [
       el("span", { className: "setting-label" }, ["Projects folder", el("small", { textContent: "Where imported .zip projects are unpacked" })]),
       el("div", { className: "setting-path-row" }, [workspace, change]),
@@ -104,7 +107,7 @@ export function openSettings() {
     e.preventDefault();
     try {
       applyPreferences(await call("set_preferences", {
-        theme: theme.value, font_size: Number(fontSize.value), word_wrap: wrap.checked,
+        theme: theme.value, font_size: Number(fontSize.value), word_wrap: wrap.checked, reopen_last: reopen.checked,
       }));
       toast("Settings saved", "success", 2000);
       close();

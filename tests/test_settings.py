@@ -3,11 +3,14 @@ from app.settings import Settings
 
 def test_preferences_defaults_and_updates(settings, tmp_path):
     assert settings.preferences() == {
-        "theme": "system", "font_size": 14, "word_wrap": True, "workspace": str(tmp_path / "workspace"),
+        "theme": "system", "font_size": 14, "word_wrap": True, "reopen_last": True,
+        "workspace": str(tmp_path / "workspace"),
     }
     new_ws = tmp_path / "Documents" / "Recerca"
-    prefs = settings.update_preferences({"theme": "dark", "font_size": 16, "word_wrap": False, "workspace": str(new_ws)})
-    assert prefs == {"theme": "dark", "font_size": 16, "word_wrap": False, "workspace": str(new_ws)}
+    prefs = settings.update_preferences({"theme": "dark", "font_size": 16, "word_wrap": False,
+                                         "reopen_last": False, "workspace": str(new_ws)})
+    assert prefs == {"theme": "dark", "font_size": 16, "word_wrap": False, "reopen_last": False,
+                     "workspace": str(new_ws)}
     assert new_ws.is_dir()
     # persisted
     assert Settings(settings.path).preferences()["theme"] == "dark"

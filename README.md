@@ -6,6 +6,8 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
 ## Features
 
 - Import projects from `.zip` (button, Ctrl+O, or drag and drop onto the window); export back to `.zip`
+- **Recent** menu in the toolbar (Ctrl+Shift+O) to switch projects; the last project reopens at
+  startup (can be turned off in Settings)
 - File tree with new/rename/delete (Recycle Bin)/add files; tabs; Ctrl+S saves and compiles
 - Formatting toolbar: bold/italic/underline (Ctrl+B/I/U, toggle), emphasis, monospace,
   super/subscript, inline math (Ctrl+M), €, °C, °, ±, µ, lists from selected lines, section, comment

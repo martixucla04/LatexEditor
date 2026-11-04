@@ -156,7 +156,12 @@ window.__editorProbe = null;
   const unbold = model.getLineContent(3);
   // Monaco's right-click menu must get the theme colours (it was unreadable in dark mode).
   const menuBg = getComputedStyle(document.getElementById("editor")).getPropertyValue("--vscode-menu-background").trim();
-  window.__editorProbe = { language: model.getLanguageId(), tokens, tokenizerError, searchSummary, suggestions, bold, unbold, menuBg };
+  // Recent projects menu in the toolbar lists the open project.
+  document.getElementById("btn-recent").click();
+  await sleep(500);
+  const recentMenu = [...document.querySelectorAll(".context-menu .recent-menu-item span")].map((s) => s.textContent);
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  window.__editorProbe = { language: model.getLanguageId(), tokens, tokenizerError, searchSummary, suggestions, bold, unbold, menuBg, recentMenu };
 })();
 """
 
@@ -240,6 +245,7 @@ def main():
         "\\ref autocomplete": editor.get("suggestions") == ["sec:intro"],
         "formatting toolbar": editor.get("bold", "").startswith("\\textbf{Hello}") and editor.get("unbold", "").startswith("Hello"),
         "editor menu has theme colours": bool(editor.get("menuBg")),
+        "recent projects menu": editor.get("recentMenu") == ["check-paper"],
         "SyncTeX source -> PDF -> source": results.get("synctex") == {"flash": True, "file": "main.tex", "line": 3},
         "spell check marks prose typos only": (results.get("spell") or {}).get("markers")
             == ["“pargraph” is not in the English (US) dictionary"],

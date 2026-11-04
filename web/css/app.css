@@ -173,6 +173,12 @@ code, kbd { font-family: var(--font-mono); font-size: 0.92em; }
 }
 
 .tb-btn svg.filled { fill: currentColor; stroke: none; }
+.tb-btn svg.caret { width: 12px; height: 12px; margin-left: -2px; }
+
+/* Recent projects menu: name + folder on two lines */
+.context-menu .recent-menu-item { height: auto; padding: 5px 10px; flex-direction: column; align-items: flex-start; gap: 0; }
+.context-menu .recent-menu-item small { color: var(--text-muted); font-size: 11px; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.context-menu .recent-menu-item.current span::after { content: "  (open)"; color: var(--text-muted); font-weight: normal; }
 .tb-btn:hover:not(:disabled) { background: var(--surface-alt); }
 .tb-btn:disabled { opacity: 0.45; cursor: default; }
 .tb-btn.icon-only { width: 30px; padding: 0; justify-content: center; }
@@ -654,7 +660,10 @@ kbd {
 /* ---------------------------------------------------------------------
    File tree
    --------------------------------------------------------------------- */
-.app-sidebar .pane-header { gap: 0; padding-right: 4px; }
+/* Never draw header buttons outside the panel; the tabs give way first. */
+.app-sidebar .pane-header { gap: 0; padding-right: 4px; overflow: hidden; }
+.app-sidebar .sidebar-tabs { min-width: 0; overflow: hidden; }
+.app-sidebar #file-actions { flex-shrink: 0; }
 .tree, .tree ul { margin: 0; padding: 0; list-style: none; }
 .tree { padding: 4px 0; }
 

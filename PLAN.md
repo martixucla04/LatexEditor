@@ -260,6 +260,9 @@ Each phase ends with something runnable and is tested before moving on.
   nothing changed 3.1 s → 0.01 s (skipped after a clean build), `.bib`-only change
   9.3 s → 6.6 s (biber first, then one LaTeX run). A `.tex` edit stays one LaTeX run: LaTeX
   cannot re-typeset a single changed file, since page numbers and references span the document.
+- Side panel minimum width 200 px (its header needs ~194 px; at 160 px the upload button stuck
+  out of the panel); the header clips instead of overflowing.
+- Toolbar **Recent** menu (Ctrl+Shift+O) and "Reopen the last project at startup" (default on).
 
 ## 9. Possible later features
 
