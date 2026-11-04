@@ -19,7 +19,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import app.api  # noqa: E402
 from app.api import Api  # noqa: E402
+
+# The probes type into the editor; never stop at the "unsaved changes, quit?" box.
+app.api.ask_yes_no = lambda *args: True
 from app.main import run  # noqa: E402
 from app.settings import Settings  # noqa: E402
 
@@ -81,6 +85,32 @@ window.__syncProbe = null;
   document.elementFromPoint(x, y).dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: x, clientY: y }));
   await sleep(1500);
   window.__syncProbe = { flash: true, file: document.querySelector(".tab.active")?.title, line: ed.getPosition().lineNumber };
+})();
+"""
+
+# Spelling: a typo in prose gets a marker (a typo inside \\cite does not), and Ctrl+. offers fixes.
+SPELL_PROBE = """
+window.__spellProbe = null;
+(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const ed = monaco.editor.getEditors()[0];
+  const model = ed.getModel();
+  for (let i = 0; i < 40 && !document.getElementById("status-spell").textContent.includes("English"); i++) await sleep(250);
+  model.pushEditOperations([], [{ range: new monaco.Range(3, 1, 3, 1), text: "A pargraph \\\\cite{smth}.\\n" }], () => null);
+  await sleep(1500);
+  const markers = monaco.editor.getModelMarkers({ owner: "spelling", resource: model.uri }).map((m) => m.message);
+  ed.focus();
+  ed.setPosition({ lineNumber: 3, column: 5 });
+  await sleep(3000); // suggestions are prefetched while the cursor rests on the word
+  ed.trigger("keyboard", "editor.action.quickFix", {});
+  let rows = [];
+  for (let i = 0; i < 40 && !rows.length; i++) {
+    await sleep(150);
+    rows = [...document.querySelectorAll(".action-widget .monaco-list-row")].map((r) => r.textContent.trim());
+  }
+  ed.trigger("keyboard", "hideCodeActionWidget", {});
+  model.pushEditOperations([], [{ range: new monaco.Range(3, 1, 4, 1), text: "" }], () => null);
+  window.__spellProbe = { status: document.getElementById("status-spell").textContent, markers, rows };
 })();
 """
 
@@ -153,10 +183,10 @@ def check(window, api, zip_path, results):
                                 lambda v: not v["building"] and v["renderedPages"] and v["pdfText"], timeout=120)
     window.evaluate_js(SYNCTEX_PROBE)
     results["synctex"] = wait_for(window, "window.__syncProbe", lambda v: True, timeout=20)
+    window.evaluate_js(SPELL_PROBE)
+    results["spell"] = wait_for(window, "window.__spellProbe", lambda v: True, timeout=30)
     window.evaluate_js(EDITOR_PROBE)
     results["editor"] = wait_for(window, "window.__editorProbe", lambda v: True, timeout=15)
-    time.sleep(0.5)
-    api.set_dirty(False)  # the probe typed into the editor; skip the unsaved-changes prompt
     window.destroy()
 
 
@@ -192,6 +222,10 @@ def main():
         "project search": editor.get("searchSummary") == "3 results in 2 files",
         "\\ref autocomplete": editor.get("suggestions") == ["sec:intro"],
         "SyncTeX source -> PDF -> source": results.get("synctex") == {"flash": True, "file": "main.tex", "line": 3},
+        "spell check marks prose typos only": (results.get("spell") or {}).get("markers")
+            == ["“pargraph” is not in the English (US) dictionary"],
+        "spelling quick fixes": any("paragraph" in r for r in (results.get("spell") or {}).get("rows", []))
+            and any("project dictionary" in r for r in (results.get("spell") or {}).get("rows", [])),
     }
     for name, ok in checks.items():
         print(f"  {'PASS' if ok else 'FAIL'}  {name}")

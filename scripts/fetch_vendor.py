@@ -64,6 +64,13 @@ PACKAGES = [
         "files": {"index.aff": "index.aff", "index.dic": "index.dic", "license": "license"},
     },
     {
+        "name": "dictionary-en-gb",
+        "version": "3.0.0",
+        "integrity": "sha512-gU/dwC9xGYPh/0CCcmGNXO8OwSgOySAqevcSXxADCsgUD+tr6OJ52u7XaC7No7dNssvdUSfVjkzcqLrRZq3kPA==",
+        "dest": "dictionaries/en-GB",
+        "files": {"index.aff": "index.aff", "index.dic": "index.dic", "license": "license"},
+    },
+    {
         "name": "dictionary-ca",
         "version": "3.0.0",
         "integrity": "sha512-h+crBYqX/X7cEU3cFAEgwIojOZTAw1wW4ybYN5Aum9f1oZ+8ULO/GGglLs8m8UBBGtSVLyoYf0CdvX8WKt8VDg==",

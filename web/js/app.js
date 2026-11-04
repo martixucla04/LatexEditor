@@ -9,6 +9,7 @@ import { setProjectData } from "./completion.js";
 import { clearPdf, highlightBoxes, onInverseSearch, showPdf } from "./pdfview.js";
 import { counts as problemCounts, initProblems, setProblems } from "./problems.js";
 import { initSearch, setSearchProject, showSearch, showSidebarView } from "./search.js";
+import { setSpellProject } from "./spell.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
@@ -69,6 +70,7 @@ async function showProject(info) {
   refreshCompletionData();
   tree.setTree(info.tree, info.main_file);
   if (!info.main_file) await chooseMainFile(info.main_candidates);
+  call("spell_settings").then(setSpellProject).catch(showError);
   if (project.main_file) {
     await openFile(project.main_file);
   }
@@ -123,6 +125,7 @@ async function closeProject() {
   showBuildProblems(null);
   setBuildLog(null);
   clearPdf();
+  setSpellProject(null);
   renderRecent();
 }
 

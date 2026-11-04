@@ -20,6 +20,14 @@ IMAGE_TYPES = {
     ".svg": "image/svg+xml", ".bmp": "image/bmp", ".webp": "image/webp",
 }
 
+SPELL_LANGUAGES = ("en", "en-GB", "ca", "es", "off")
+LANGUAGE_NAMES = {
+    "english": "en", "american": "en", "USenglish": "en", "british": "en-GB", "UKenglish": "en-GB",
+    "catalan": "ca", "spanish": "es", "castilian": "es",
+}
+BABEL = re.compile(r"^[^%\n]*\\usepackage\[([^\]]*)\]\{babel\}", re.M)
+POLYGLOSSIA = re.compile(r"^[^%\n]*\\set(?:main|default)language(?:\[[^\]]*\])?\{([A-Za-z]+)\}", re.M)
+
 MAGIC_ROOT = re.compile(r"^\s*%\s*!\s*TeX\s+root\s*=\s*(.+?)\s*$", re.I | re.M)
 DOCUMENTCLASS = re.compile(r"^[^%\n]*\\documentclass", re.M)
 
@@ -88,6 +96,54 @@ class Project:
             raise UserError("The main file must be an existing .tex file.")
         self.config["main_file"] = self.rel(path)
         self._save_config()
+
+    def detect_language(self) -> str:
+        """Spell-check language from the main file's babel/polyglossia setup (default English)."""
+        main = self.main_file
+        try:
+            text = (self.root / main).read_text(encoding="utf-8", errors="replace") if main else ""
+        except OSError:
+            text = ""
+        m = POLYGLOSSIA.search(text)
+        if m and m.group(1) in LANGUAGE_NAMES:
+            # \setdefaultlanguage[variant=british]{english}
+            if m.group(1) == "english" and re.search(r"variant\s*=\s*(british|uk)", m.group(0)):
+                return "en-GB"
+            return LANGUAGE_NAMES[m.group(1)]
+        m = BABEL.search(text)
+        if m:
+            # babel's main language is the last one listed (or main=...)
+            options = [o.strip() for o in m.group(1).split(",")]
+            main_opt = next((o.split("=", 1)[1] for o in options if o.startswith("main=")), None)
+            for name in [main_opt, *reversed(options)]:
+                if name in LANGUAGE_NAMES:
+                    return LANGUAGE_NAMES[name]
+        return "en"
+
+    def spell_settings(self) -> dict:
+        spell = self.config.get("spell", {})
+        language = spell.get("language")
+        return {
+            "language": language if language in SPELL_LANGUAGES else self.detect_language(),
+            "words": sorted(spell.get("words", [])),
+        }
+
+    def set_spell_language(self, language: str) -> dict:
+        if language not in SPELL_LANGUAGES:
+            raise UserError(f"Unknown spell-check language: {language}")
+        self.config.setdefault("spell", {})["language"] = language
+        self._save_config()
+        return self.spell_settings()
+
+    def add_spell_word(self, word: str) -> dict:
+        word = word.strip()
+        if not word or any(c.isspace() for c in word):
+            raise UserError("Only single words can be added to the dictionary.")
+        words = set(self.config.setdefault("spell", {}).get("words", []))
+        words.add(word)
+        self.config["spell"]["words"] = sorted(words)
+        self._save_config()
+        return self.spell_settings()
 
     @property
     def pdf_path(self) -> Path | None:

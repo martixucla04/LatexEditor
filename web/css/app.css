@@ -931,3 +931,24 @@ kbd {
 }
 
 .statusbar .warning { color: var(--warning); }
+
+.status-btn {
+  height: 20px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.status-btn:hover { background: var(--surface-alt); color: var(--text); }
+
+/* Spelling mistakes: hint markers (hover, quick fix) whose short default mark is
+   hidden, plus a full-word wavy underline in their own colour (spell.js). */
+.monaco-editor .squiggly-hint { background: none !important; }
+
+.monaco-editor .spell-error {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3' height='3' width='6'%3E%3Cpath d='m0 2.5 1.5-1.5 1.5 1.5 1.5-1.5 1.5 1.5' fill='none' stroke='%23d63384' stroke-width='.8'/%3E%3C/svg%3E") repeat-x bottom left;
+}

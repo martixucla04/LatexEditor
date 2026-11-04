@@ -103,6 +103,34 @@ def test_rename_main_file_updates_config(make_project):
     assert p.main_file == "thesis.tex"
 
 
+@pytest.mark.parametrize("preamble, expected", [
+    ("", "en"),
+    ("\\usepackage[catalan]{babel}\n", "ca"),
+    ("\\usepackage[english,spanish]{babel}\n", "es"),  # babel: the last language is the main one
+    ("\\usepackage[spanish,main=catalan]{babel}\n", "ca"),
+    ("\\usepackage{polyglossia}\n\\setdefaultlanguage{catalan}\n\\setotherlanguage{english}\n", "ca"),
+    ("% \\usepackage[catalan]{babel}\n", "en"),
+    ("\\usepackage[british]{babel}\n", "en-GB"),
+    ("\\setdefaultlanguage[variant=british]{english}\n", "en-GB"),
+])
+def test_spell_language_detection(make_project, preamble, expected):
+    p = Project(make_project({"main.tex": "\\documentclass{article}\n" + preamble + "\\begin{document}\n\\end{document}\n"}))
+    assert p.spell_settings() == {"language": expected, "words": []}
+
+
+def test_spell_settings_persist(make_project):
+    root = make_project({"main.tex": DOC})
+    p = Project(root)
+    p.set_spell_language("ca")
+    p.add_spell_word("Kirchhoff")
+    p.add_spell_word("FEniCS")
+    assert Project(root).spell_settings() == {"language": "ca", "words": ["FEniCS", "Kirchhoff"]}
+    with pytest.raises(UserError):
+        p.set_spell_language("fr")
+    with pytest.raises(UserError):
+        p.add_spell_word("two words")
+
+
 def test_add_files_avoids_overwrite(make_project, tmp_path):
     src = tmp_path / "fig.png"
     src.write_bytes(b"png")

@@ -224,6 +224,16 @@ class Api:
                               bool(o.get("case")), bool(o.get("word")),
                               o.get("include") or search.DEFAULT_INCLUDE, files)
 
+    def spell_settings(self):
+        """{language: "en"|"ca"|"es"|"off", words: [project dictionary]}"""
+        return self._require_project().spell_settings()
+
+    def set_spell_language(self, language: str):
+        return self._require_project().set_spell_language(language)
+
+    def add_spell_word(self, word: str):
+        return self._require_project().add_spell_word(word)
+
     def completion_data(self):
         """Labels, bibliography entries, user macros and files for autocomplete."""
         return scan_project(self._require_project().root)

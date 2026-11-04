@@ -4,6 +4,7 @@
 
 import { registerCompletions } from "./completion.js";
 import { registerLanguages, TOKEN_RULES } from "./latex-lang.js";
+import { attachSpell, initSpell } from "./spell.js";
 import { confirmDialog } from "./ui.js";
 
 const LANGUAGE_BY_EXT = {
@@ -49,6 +50,7 @@ export async function initEditor(options) {
   handlers = { ...handlers, ...options };
   monaco = await loadMonaco();
   registerLanguages(monaco);
+  initSpell(monaco);
   registerCompletions(monaco, {
     buffers: () => [...tabs.values()].filter((t) => t.model)
       .map((t) => ({ path: t.path, text: isDirty(t) ? t.model.getValue() : "", dirty: isDirty(t) })),
@@ -139,6 +141,7 @@ export function openTab(path, data, { focus = true } = {}) {
         renderTabs();
         notifyDirty();
       });
+      if (extOf(path) === "tex") attachSpell(tab.model);
     }
     tabs.set(path, tab);
     applyMarkers(tab);

@@ -43,7 +43,7 @@ All JS libraries are downloaded once by `scripts/fetch_vendor.py` (pinned versio
 checked) into `web/vendor/` (git-ignored), so the app works fully offline.
 
 Pinned versions: pywebview 6.2.1, Monaco 0.57.0, PDF.js (`pdfjs-dist`) 6.4.299, typo.js 1.3.2,
-`dictionary-en` 4.0.0, `dictionary-ca` 3.0.0, `dictionary-es` 4.0.0; dev: pytest 9.1.1,
+`dictionary-en` 4.0.0, `dictionary-en-gb` 3.0.0, `dictionary-ca` 3.0.0, `dictionary-es` 4.0.0; dev: pytest 9.1.1,
 PyInstaller 6.22.3.
 
 ## 4. Architecture
@@ -84,7 +84,8 @@ latexeditor/
       problems.js    # problems panel (markers live in editor.js)
       synctex.js
       search.js      # sidebar Search view (project find/replace)
-      spell/         # spell-check worker
+      spell.js       # spell-check markers, quick fixes, language picker
+      spell/worker.js  # typo.js dictionary + LaTeX-aware word extraction
     smoke.html       # dev-only page for scripts/smoke_test.py
     vendor/          # monaco, pdfjs, typo, dictionaries (fetched, not hand-edited)
   scripts/
@@ -187,12 +188,20 @@ ignores the `max_print_line` env var and `--cnf-line`), so the log parser unwrap
 
 ### 4.8 Spell check
 
-- Web Worker running typo.js with the selected Hunspell dictionary (English first; Catalan and
-  Spanish dictionaries can be added in Settings).
-- Tokenizer skips commands, their key arguments (`\ref{}`, `\cite{}`, `\label{}`, `\begin{}`…),
-  math (`$…$`, `\[…\]`, math environments) and comments.
-- Misspellings shown as info-level squiggles; quick-fix menu with suggestions, "Add to project
-  dictionary" (stored in `.latexeditor.json`).
+- Web Worker (`web/js/spell/worker.js`) running typo.js with the project's Hunspell dictionary:
+  `en` (US), `en-GB`, `ca`, `es`, or off. Default from the main file's babel (last language or
+  `main=`) / polyglossia (`\setdefaultlanguage`, `variant=british`); changeable from the status
+  bar; stored with the project word list in `.latexeditor.json` (`"spell"`).
+- Measured load times: en 0.1 s, en-GB 0.9 s, es 0.7 s, **ca ~11 s** (typo.js expands all affix
+  forms); the dictionary stays loaded in the worker for the session. Suggestions take 1–3 s,
+  so they are prefetched when the cursor rests on a misspelled word.
+- The text is masked before word extraction: comments, commands, options `[...]`, non-prose
+  arguments (`\ref`, `\cite`, `\label`, paths, `\begin{..}{..}`, `\url`, `\texttt`, units…),
+  inline/display math and math/verbatim/code environments. Acronyms and mixed-case words
+  (LaTeX, FEniCS) are skipped; hyphenated words are checked per part; elisions
+  (`l'enginyeria`, `d'aquesta`) fall back to checking each part.
+- Misspellings are "hint" markers (hover + Ctrl+. quick fixes: suggestions, "Add to project
+  dictionary") drawn as a full-word pink wavy underline via a decoration.
 
 ## 5. Development phases
 
@@ -208,7 +217,7 @@ Each phase ends with something runnable and is tested before moving on.
 | 5 | **Editor intelligence** ✅ | LaTeX + BibTeX highlighting (math, refs, sections), autocomplete (commands, envs with snippets, `\end{` closes the open env, refs incl. unsaved labels, cites with author/year/title, files, packages, user macros), hover on `\ref`/`\cite`, folding, Ctrl+/ |
 | 6 | **SyncTeX** ✅ | Ctrl+Alt+J / "Find in PDF" highlights the cursor's line in the PDF; double-click in the PDF opens the source line (with a flash); multi-file and accented paths |
 | 7 | **Find/replace in project** ✅ | Sidebar Search view (Ctrl+Shift+F): literal/regex, case, whole word, file patterns; results grouped by file, click selects the match; Replace all with confirmation, saves open files first, open tabs updated (undoable); Monaco Ctrl+F/Ctrl+H in the current file |
-| 8 | **Spell check** | English dictionary, suggestions, project dictionary |
+| 8 | **Spell check** ✅ | English (US/UK), Català, Español in a Web Worker; language auto-detected from babel/polyglossia, switchable in the status bar; LaTeX-aware (skips commands, refs/cites, paths, math, comments, code); quick fixes with suggestions and "Add to project dictionary" |
 | 9 | **Polish & package** | Light/dark theme, settings dialog (font size, dictionary, workspace path), unsaved-changes prompts, `LatexEditor.exe` via PyInstaller |
 
 ## 6. Testing
@@ -230,7 +239,7 @@ Each phase ends with something runnable and is tested before moving on.
 | MiKTeX missing-package popups stall builds | Detect stall, guide user to enable auto-install |
 | PDF flicker / losing position on reload | Render new PDF off-screen, swap, restore page + scroll offset |
 | Untrusted zips | Zip-slip checks, size limits, no shell-escape |
-| typo.js suggestions are slow on large dictionaries | Run in a Web Worker, check visible ranges only, compute suggestions on demand |
+| typo.js is slow on large dictionaries (Catalan loads in ~11 s, suggestions 1–3 s) | Web Worker, dictionary kept loaded for the session, status shows "loading", suggestions prefetched on cursor rest; possible later: cache the expanded dictionary in IndexedDB |
 
 ## 8. Possible later features
 
