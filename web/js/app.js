@@ -9,6 +9,7 @@ import { setProjectData } from "./completion.js";
 import { clearPdf, highlightBoxes, onInverseSearch, showPdf } from "./pdfview.js";
 import { counts as problemCounts, initProblems, setProblems } from "./problems.js";
 import { initSearch, setSearchProject, showSearch, showSidebarView } from "./search.js";
+import { initFormatBar } from "./format.js";
 import { loadPreferences, openSettings } from "./settings.js";
 import { setSpellProject } from "./spell.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
@@ -593,7 +594,7 @@ function initToolbar() {
 
 function initShortcuts() {
   const ctrl = {
-    b: toggleSidebar,
+    // Ctrl+B/I/U format text in the editor (format.js); the file panel is Ctrl+Shift+B.
     j: togglePanel,
     o: () => importZip(),
     s: compile,
@@ -606,6 +607,12 @@ function initShortcuts() {
     if (document.querySelector("dialog[open]")) return;
     if (event.key === "F5") {
       event.preventDefault();
+      return;
+    }
+    if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyB") {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleSidebar();
       return;
     }
     if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyF") {
@@ -696,6 +703,7 @@ async function main() {
       $("status-cursor").textContent = pos ? `Ln ${pos.lineNumber}, Col ${pos.column}` : "";
     },
   });
+  initFormatBar();
   await Promise.all([showAppInfo(), renderRecent()]);
   await loadPreferences({
     onWorkspaceChange: (ws) => {

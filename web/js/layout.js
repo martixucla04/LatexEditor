@@ -5,7 +5,7 @@
 const STORAGE_KEY = "latexeditor.layout";
 const DEFAULT_PDF_RATIO = 0.45;
 const MIN_EDITOR_W = 320;
-const MIN_EDITOR_H = 120;
+const MIN_EDITOR_H = 200;
 const KEY_STEP = 16;
 
 const workbench = document.getElementById("workbench");

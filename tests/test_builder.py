@@ -73,7 +73,19 @@ def test_plain_document(make_project):
     assert (root / ".build" / "main.synctex.gz").exists()
     # first build needs a second run for the \ref
     assert tools(result) == ["lualatex", "lualatex"]
-    # nothing changed: a single run is enough
+    # nothing changed: no run at all, same PDF
+    again = Builder(root, "main.tex").run()
+    assert (tools(again), again.status, again.pdf) == ([], "success", result.pdf)
+    assert again.message.startswith("Up to date")
+    # an edit: a single run
+    (root / "main.tex").write_text(PLAIN.replace("See", "Now see"), encoding="utf-8")
+    assert tools(Builder(root, "main.tex").run()) == ["lualatex"]
+
+
+def test_failed_build_is_not_skipped(make_project):
+    root = make_project({"main.tex": PLAIN.replace("See", r"\undefinedmacro See")})
+    assert Builder(root, "main.tex").run().status == "errors"
+    # unchanged, but the last build was not clean: build again
     assert tools(Builder(root, "main.tex").run()) == ["lualatex"]
 
 
@@ -84,10 +96,18 @@ def test_biblatex_runs_biber_only_when_needed(make_project):
     assert tools(first)[:3] == ["lualatex", "biber", "lualatex"]
     assert "Citation 'smith2020' undefined" not in log_of(root)
 
-    assert "biber" not in tools(Builder(root, "main.tex").run())
+    assert tools(Builder(root, "main.tex").run()) == []  # up to date
 
+    # only the .bib changed: biber first, then LaTeX (no wasted first LaTeX run)
     (root / "refs.bib").write_text(BIB.replace("Heat", "Cold"), encoding="utf-8")
-    assert "biber" in tools(Builder(root, "main.tex").run())
+    bib_only = Builder(root, "main.tex").run()
+    assert bib_only.status == "success", bib_only.log[-2000:]
+    assert tools(bib_only)[:2] == ["biber", "lualatex"]
+    assert "Cold" in (root / ".build" / "main.bbl").read_text(encoding="utf-8")
+
+    # a .tex change still starts with LaTeX
+    (root / "main.tex").write_text(BIBLATEX.replace("Text", "Some text"), encoding="utf-8")
+    assert tools(Builder(root, "main.tex").run())[0] == "lualatex"
 
 
 def test_natbib_runs_bibtex_from_subfolder_bib(make_project):

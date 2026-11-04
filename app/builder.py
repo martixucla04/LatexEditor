@@ -11,6 +11,12 @@ Everything is written to <project>/.build. The commands run from the project
 root, so \\input, \\includegraphics and .bib paths resolve like on Overleaf.
 Hashes of each auxiliary tool's inputs are kept in .build/.latexeditor-build.json
 so a typical Ctrl+S build is a single lualatex run.
+
+Shortcuts, based on a size/mtime fingerprint of every project file:
+    nothing changed since a clean build   -> no run at all ("Up to date")
+    only .bib files changed               -> biber | bibtex, then lualatex (skips the first run)
+LaTeX itself cannot re-typeset just one changed file: page numbers, references and
+the table of contents depend on the whole document.
 """
 
 import hashlib
@@ -25,6 +31,7 @@ from pathlib import Path, PurePosixPath
 
 from .logparser import collect_problems
 from .project import BUILD_DIR
+from .workspace import iter_project_files
 
 STATE_FILE = ".latexeditor-build.json"
 MAX_LATEX_RUNS = 5
@@ -250,15 +257,50 @@ class Builder:
             ran = True
         return ran
 
+    def _fingerprint(self) -> dict:
+        """Size and modification time of every project file (not .build): cheap change detection."""
+        prints = {}
+        for path in iter_project_files(self.root):
+            try:
+                st = path.stat()
+            except OSError:
+                continue
+            prints[path.relative_to(self.root).as_posix()] = [st.st_size, st.st_mtime_ns]
+        return prints
+
+    def _read_log(self) -> str:
+        return _read(self._out(".log")).decode("utf-8", errors="replace")
+
     def run(self) -> BuildResult:
         start = time.monotonic()
         started_at = time.time()
         self.build_dir.mkdir(exist_ok=True)
         pdf = self._out(".pdf")
+        state = self._load_state()
+        inputs = self._fingerprint()  # taken before building, so edits made meanwhile count next time
+        previous = state.get("inputs") if state.get("main") == self.main_rel and pdf.exists() else None
+        changed = None if previous is None else {
+            rel for rel in previous.keys() | inputs.keys() if previous.get(rel) != inputs.get(rel)}
+
+        # 1. Nothing changed since a clean build: the PDF is already current.
+        if changed == set() and state.get("clean"):
+            log = self._read_log()
+            problems = collect_problems(self.root, self.build_dir, self.jobname, log)
+            return BuildResult("success", "Up to date: nothing changed since the last build", str(pdf), log,
+                               round(time.monotonic() - start, 2), [], [p.to_dict() for p in problems])
+
         try:
-            step = self._lualatex()
-            log = _read(self._out(".log")).decode("utf-8", errors="replace")
-            state = self._load_state()
+            step = None
+            # 2. Only bibliography files changed: LaTeX's .bcf/.aux are still valid, so run
+            #    biber/BibTeX first and then LaTeX once, instead of LaTeX, biber, LaTeX.
+            if changed and all(rel.lower().endswith(".bib") for rel in changed):
+                if self._aux_tools(state, self._read_log()):
+                    self._save_state(state)
+                    step = self._lualatex()
+
+            if step is None:
+                step = self._lualatex()
+            log = self._read_log()
             produced = pdf.exists() and pdf.stat().st_mtime >= started_at - 1
 
             if produced:
@@ -297,5 +339,10 @@ class Builder:
             status, message = "errors", f"Compiled, but {failed_tool.tool} reported errors"
         else:
             status, message = "success", f"Compiled in {duration:.1f} s"
+
+        # Remember what this build saw; only a clean build may be skipped next time
+        # (after errors, rebuilding may help, e.g. once a missing package is installed).
+        state.update(inputs=inputs, main=self.main_rel, clean=status == "success")
+        self._save_state(state)
         return BuildResult(status, message, str(pdf) if produced else None, log, duration, self.steps,
                            [p.to_dict() for p in problems])

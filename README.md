@@ -7,7 +7,10 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
 
 - Import projects from `.zip` (button, Ctrl+O, or drag and drop onto the window); export back to `.zip`
 - File tree with new/rename/delete (Recycle Bin)/add files; tabs; Ctrl+S saves and compiles
-- LuaLaTeX builds with biber/BibTeX, glossaries and index run automatically when needed
+- Formatting toolbar: bold/italic/underline (Ctrl+B/I/U, toggle), emphasis, monospace,
+  super/subscript, inline math (Ctrl+M), €, °C, °, ±, µ, lists from selected lines, section, comment
+- LuaLaTeX builds with biber/BibTeX, glossaries and index run automatically when needed;
+  unchanged projects are not rebuilt and a `.bib`-only change skips the first LaTeX run
 - PDF preview that keeps its zoom and position; SyncTeX (Ctrl+Alt+J ↔ double-click in the PDF)
 - Problems panel with clickable errors and squiggles in the editor
 - LaTeX/BibTeX highlighting; autocomplete for commands, environments, `\ref`, `\cite`, files

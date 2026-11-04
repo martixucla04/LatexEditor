@@ -247,7 +247,21 @@ Each phase ends with something runnable and is tested before moving on.
 | pywebview fills `window.pywebview.api` in after creating it | `bridge.js` calls the live object and waits briefly for a function to appear; no "backend missing" timeout inside WebView2 |
 | typo.js is slow on large dictionaries (Catalan loads in ~11 s, suggestions 1–3 s) | Web Worker, dictionary kept loaded for the session, status shows "loading", suggestions prefetched on cursor rest; possible later: cache the expanded dictionary in IndexedDB |
 
-## 8. Possible later features
+## 8. Upgrades after v1
+
+- Dark mode: Monaco's right-click menu is placed beside the editor node and missed the theme's
+  `--vscode-*` colours (transparent, black text); they are copied onto the container.
+- Layout: the side panel used the class `sidebar`, which `pdf_viewer.css` also styles (fixed
+  width, border), so it did not follow its grid column; renamed to `app-sidebar`. The code area
+  keeps at least 200 px of height.
+- Formatting toolbar (`format.js`) with toggling wraps and Ctrl+B/I/U/M; the file panel moved
+  to Ctrl+Shift+B.
+- Faster rebuilds (measured on the sample paper; each LuaLaTeX run ≈ 3 s, biber ≈ 3.4 s):
+  nothing changed 3.1 s → 0.01 s (skipped after a clean build), `.bib`-only change
+  9.3 s → 6.6 s (biber first, then one LaTeX run). A `.tex` edit stays one LaTeX run: LaTeX
+  cannot re-typeset a single changed file, since page numbers and references span the document.
+
+## 9. Possible later features
 
 Document outline panel, Git-based version snapshots, `--shell-escape` opt-in per project,
 Catalan/Spanish UI, word count, image preview in file tree, templates for new projects.

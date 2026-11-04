@@ -18,6 +18,7 @@ const tabsEl = $("tabs");
 const editorEl = $("editor");
 const fileViewEl = $("file-view");
 const noFileEl = $("no-file");
+const formatBarEl = $("format-bar");
 
 let monaco = null;
 let editor = null;
@@ -39,11 +40,40 @@ function loadMonaco() {
   });
 }
 
+let currentTheme = null;
+
 function applyTheme() {
   const dark = document.documentElement.dataset.theme
     ? document.documentElement.dataset.theme === "dark"
     : matchMedia("(prefers-color-scheme: dark)").matches;
-  monaco.editor.setTheme(dark ? "latex-dark" : "latex-light");
+  currentTheme = dark ? "latex-dark" : "latex-light";
+  monaco.editor.setTheme(currentTheme);
+  shareThemeVariables();
+}
+
+// Monaco's right-click menu lives next to the editor DOM node, not inside it, so it
+// doesn't inherit the theme's --vscode-* colours (in dark mode it rendered transparent
+// with black text). Copy them onto the container the menu is placed in.
+let sharedTheme = null; // theme whose colours are already on the container
+
+function shareThemeVariables() {
+  if (!editor) return;
+  const theme = currentTheme;
+  if (sharedTheme === theme) return;
+  requestAnimationFrame(() => {
+    const node = editor.getDomNode();
+    if (!node) return;
+    const cs = getComputedStyle(node);
+    let copied = 0;
+    for (let i = 0; i < cs.length; i++) {
+      const name = cs[i];
+      if (name.startsWith("--vscode-")) {
+        editorEl.style.setProperty(name, cs.getPropertyValue(name));
+        copied++;
+      }
+    }
+    if (copied) sharedTheme = theme; // none yet = no file shown yet; retry on the next model
+  });
 }
 
 export async function initEditor(options) {
@@ -102,6 +132,9 @@ export async function initEditor(options) {
     dropIntoEditor: { enabled: false }, // dropped files are imported/added, not pasted as text
   });
   editor.onDidChangeCursorPosition((e) => handlers.onCursor(e.position));
+  // The themed DOM only exists once a file is shown, so share the colours then too.
+  editor.onDidChangeModel(shareThemeVariables);
+  shareThemeVariables();
   updateView();
   return monaco;
 }
@@ -330,6 +363,113 @@ export function focusEditor() {
   if (tabs.get(activePath)?.kind === "text") editor.focus();
 }
 
+// ---------------------------------------------------------------------------
+// Formatting helpers (used by format.js)
+// ---------------------------------------------------------------------------
+
+const textTabActive = () => tabs.get(activePath)?.kind === "text";
+
+// Wrap each selection in before…after, or remove the wrapper if it is already there
+// (around the selection, or the selection itself starts/ends with it). An empty
+// selection inserts before|after with the cursor in between.
+export function toggleWrap(before, after) {
+  if (!textTabActive()) return;
+  const model = editor.getModel();
+  const edits = [];
+  const selections = [];
+  for (const sel of editor.getSelections()) {
+    const text = model.getValueInRange(sel);
+    const start = model.getOffsetAt(sel.getStartPosition());
+    const end = model.getOffsetAt(sel.getEndPosition());
+    const full = model.getValue();
+    const outerBefore = full.slice(Math.max(0, start - before.length), start);
+    const outerAfter = full.slice(end, end + after.length);
+    const pos = (offset) => model.getPositionAt(offset);
+    const range = (a, b) => monaco.Range.fromPositions(pos(a), pos(b));
+
+    const wrapLength = before.length + after.length;
+    if (outerBefore === before && outerAfter === after) {
+      // \textbf{[sel]} -> [sel]  (also \textbf{|} -> | for a second Ctrl+B)
+      edits.push({ range: range(end, end + after.length), text: "" }, { range: range(start - before.length, start), text: "" });
+      selections.push({ at: start, start: start - before.length, length: text.length, delta: -wrapLength });
+    } else if (text.length > wrapLength && text.startsWith(before) && text.endsWith(after)) {
+      // [\textbf{x}] -> [x]
+      const inner = text.slice(before.length, text.length - after.length);
+      edits.push({ range: sel, text: inner });
+      selections.push({ at: start, start, length: inner.length, delta: -wrapLength });
+    } else {
+      edits.push({ range: sel, text: before + text + after });
+      selections.push({ at: start, start: start + before.length, length: text.length, delta: wrapLength });
+    }
+  }
+  applyEdits(edits, selections);
+}
+
+// selections: [{at, start, length, delta}] in offsets of the text before editing, where
+// `start` already accounts for the selection's own edit; `delta` is its length change.
+function applyEdits(edits, selections) {
+  const model = editor.getModel();
+  editor.pushUndoStop();
+  editor.executeEdits("format", edits);
+  // Each selection moves by the length changes of the edits before it.
+  const sorted = [...selections].sort((a, b) => a.at - b.at);
+  let shift = 0;
+  for (const s of sorted) {
+    s.start += shift;
+    shift += s.delta;
+  }
+  editor.setSelections(selections.map((s) => {
+    const a = model.getPositionAt(s.start);
+    const b = model.getPositionAt(s.start + s.length);
+    return new monaco.Selection(a.lineNumber, a.column, b.lineNumber, b.column);
+  }));
+  editor.pushUndoStop();
+  editor.focus();
+}
+
+// Replace the selections with `text` (symbols such as € or °C).
+export function insertText(text) {
+  if (!textTabActive()) return;
+  editor.pushUndoStop();
+  editor.executeEdits("format", editor.getSelections().map((range) => ({ range, text, forceMoveMarkers: true })));
+  editor.pushUndoStop();
+  editor.focus();
+}
+
+// Turn the selected lines into \item lines of a list (or insert an empty list).
+export function makeList(env) {
+  if (!textTabActive()) return;
+  const model = editor.getModel();
+  const sel = editor.getSelection();
+  const indent = model.getLineContent(sel.startLineNumber).match(/^\s*/)[0];
+  const snippet = editor.getContribution("snippetController2");
+  if (sel.isEmpty()) {
+    snippet.insert(`\\\\begin{${env}}\n\t\\\\item $0\n\\\\end{${env}}`);
+  } else {
+    const endLine = sel.endColumn === 1 && sel.endLineNumber > sel.startLineNumber ? sel.endLineNumber - 1 : sel.endLineNumber;
+    const range = new monaco.Range(sel.startLineNumber, 1, endLine, model.getLineMaxColumn(endLine));
+    const items = model.getValueInRange(range).split(/\r?\n/).filter((l) => l.trim())
+      .map((l) => `${indent}  \\item ${l.trim().replace(/^\\item\s*/, "")}`);
+    editor.executeEdits("format", [{ range, text: [`${indent}\\begin{${env}}`, ...items, `${indent}\\end{${env}}`].join("\n") }]);
+  }
+  editor.focus();
+}
+
+export function runAction(id) {
+  if (!textTabActive()) return;
+  editor.focus();
+  editor.getAction(id)?.run();
+}
+
+// [["CtrlCmd+KeyB", fn], …]: editor-level shortcuts (they win over Monaco's defaults,
+// e.g. Ctrl+I "trigger suggest" and Ctrl+U "cursor undo").
+export function addEditorKeybindings(bindings) {
+  for (const [combo, fn] of bindings) {
+    const key = combo.split("+").reduce((acc, part) => acc | (part in monaco.KeyMod ? monaco.KeyMod[part] : monaco.KeyCode[part]), 0);
+    editor.addCommand(key, fn);
+  }
+}
+
 // Selected text in the active file (single line only), for pre-filling the search box.
 export function selectionText() {
   if (tabs.get(activePath)?.kind !== "text") return "";
@@ -400,6 +540,7 @@ export function revealLine(line, problem = null) {
 function updateView() {
   const tab = tabs.get(activePath);
   editorEl.hidden = tab?.kind !== "text";
+  formatBarEl.hidden = tab?.kind !== "text" || tab.model.getLanguageId() !== "latex";
   fileViewEl.hidden = !tab || tab.kind === "text";
   noFileEl.hidden = !projectOpen || !!tab;
   if (tab && tab.kind !== "text") {

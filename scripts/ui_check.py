@@ -147,7 +147,16 @@ window.__editorProbe = null;
     .map((r) => r.getAttribute("aria-label").split(",")[0]);
   ed.trigger("keyboard", "hideSuggestWidget", {});
   ed.trigger("keyboard", "undo", {});
-  window.__editorProbe = { language: model.getLanguageId(), tokens, tokenizerError, searchSummary, suggestions };
+  // Formatting toolbar: Bold wraps the selected word, a second click unwraps it.
+  ed.focus();
+  ed.setSelection(new monaco.Selection(3, 1, 3, 6)); // "Hello"
+  document.querySelector('.format-btn[data-action="bold"]').click();
+  const bold = model.getLineContent(3);
+  document.querySelector('.format-btn[data-action="bold"]').click();
+  const unbold = model.getLineContent(3);
+  // Monaco's right-click menu must get the theme colours (it was unreadable in dark mode).
+  const menuBg = getComputedStyle(document.getElementById("editor")).getPropertyValue("--vscode-menu-background").trim();
+  window.__editorProbe = { language: model.getLanguageId(), tokens, tokenizerError, searchSummary, suggestions, bold, unbold, menuBg };
 })();
 """
 
@@ -184,7 +193,7 @@ def _check(window, api, zip_path, results):
     time.sleep(1)
     results["after_reload"] = wait_for(window, LAYOUT_PROBE, lambda v: v["recent"])
     window.evaluate_js('document.querySelector(".recent-item").click()')
-    results["project"] = wait_for(window, PROJECT_PROBE, lambda v: v["tabs"] and v["editorLines"])
+    results["project"] = wait_for(window, PROJECT_PROBE, lambda v: v["tabs"] and v["editorLines"] >= 5)
 
     window.evaluate_js('document.getElementById("btn-compile").click()')
     time.sleep(0.5)
@@ -229,6 +238,8 @@ def main():
         # \input{sec/intro} in main.tex; "Intro" and sec:intro in sec/intro.tex (case-insensitive)
         "project search": editor.get("searchSummary") == "3 results in 2 files",
         "\\ref autocomplete": editor.get("suggestions") == ["sec:intro"],
+        "formatting toolbar": editor.get("bold", "").startswith("\\textbf{Hello}") and editor.get("unbold", "").startswith("Hello"),
+        "editor menu has theme colours": bool(editor.get("menuBg")),
         "SyncTeX source -> PDF -> source": results.get("synctex") == {"flash": True, "file": "main.tex", "line": 3},
         "spell check marks prose typos only": (results.get("spell") or {}).get("markers")
             == ["“pargraph” is not in the English (US) dictionary"],

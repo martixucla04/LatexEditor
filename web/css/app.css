@@ -218,10 +218,10 @@ code, kbd { font-family: var(--font-mono); font-size: 0.92em; }
 #pdf-pane { grid-area: pdf; }
 
 .workbench.sidebar-hidden { grid-template-columns: 0 0 minmax(0, 1fr) 5px var(--pdf-w); }
-.workbench.sidebar-hidden .sidebar,
+.workbench.sidebar-hidden .app-sidebar,
 .workbench.sidebar-hidden #split-sidebar { display: none; }
 
-.sidebar, .editor-column, .pdf-pane {
+.app-sidebar, .editor-column, .pdf-pane {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -327,6 +327,38 @@ body.resizing-col .pdf-viewer, body.resizing-row .editor { pointer-events: none;
 /* Unsaved: a dot that turns into × on hover. */
 .tab.dirty .tab-close::before { content: "●"; font-size: 10px; }
 .tab.dirty .tab-close:hover::before { content: "×"; font-size: 15px; }
+
+/* Formatting toolbar above the editor */
+.format-bar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.format-btn {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: 13px/1 var(--font-ui);
+  cursor: pointer;
+}
+
+.format-btn:hover { background: var(--surface-alt); }
+.format-btn:active { background: var(--border); }
+.format-btn code { font: 600 12px var(--font-mono); }
+.format-btn sup, .format-btn sub { font-size: 9px; }
+.format-sep { width: 1px; height: 18px; margin: 0 5px; background: var(--border); }
 
 .editor-area { position: relative; flex: 1; min-height: 0; }
 .editor { position: absolute; inset: 0; }
@@ -622,7 +654,7 @@ kbd {
 /* ---------------------------------------------------------------------
    File tree
    --------------------------------------------------------------------- */
-.sidebar .pane-header { gap: 0; padding-right: 4px; }
+.app-sidebar .pane-header { gap: 0; padding-right: 4px; }
 .tree, .tree ul { margin: 0; padding: 0; list-style: none; }
 .tree { padding: 4px 0; }
 
