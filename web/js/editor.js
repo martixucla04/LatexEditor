@@ -1,0 +1,306 @@
+// Monaco editor with one tab per open file. Each tab keeps its own model,
+// view state (cursor/scroll) and saved version, so dirty state and position
+// survive tab switches. Images and binary files open in a read-only viewer.
+
+import { confirmDialog } from "./ui.js";
+
+const LANGUAGE_BY_EXT = {
+  tex: "latex", sty: "latex", cls: "latex", ltx: "latex", dtx: "latex", ins: "latex", clo: "latex",
+  bib: "bibtex", bst: "plaintext",
+  md: "markdown", lua: "lua", json: "json", yaml: "yaml", yml: "yaml", xml: "xml", py: "python",
+};
+
+const $ = (id) => document.getElementById(id);
+const tabsEl = $("tabs");
+const editorEl = $("editor");
+const fileViewEl = $("file-view");
+const noFileEl = $("no-file");
+
+let monaco = null;
+let editor = null;
+let projectOpen = false;
+let activePath = null;
+let modelCounter = 0;
+const tabs = new Map(); // path -> { path, kind, model, viewState, encoding, savedVersion, data }
+let handlers = { onDirtyChange() {}, onActiveChange() {}, onCursor() {} };
+let lastDirty = false;
+
+const extOf = (path) => (path.includes(".") ? path.split(".").pop().toLowerCase() : "");
+const nameOf = (path) => path.split("/").pop();
+
+function loadMonaco() {
+  return new Promise((resolve, reject) => {
+    window.require.config({ paths: { vs: "vendor/monaco/vs" } });
+    window.require(["vs/editor/editor.main"], () => resolve(window.monaco), reject);
+  });
+}
+
+function applyTheme() {
+  const dark = document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  monaco.editor.setTheme(dark ? "latex-dark" : "latex-light");
+}
+
+export async function initEditor(options) {
+  handlers = { ...handlers, ...options };
+  monaco = await loadMonaco();
+  monaco.languages.register({ id: "latex", extensions: [".tex", ".sty", ".cls"], aliases: ["LaTeX"] });
+  monaco.languages.register({ id: "bibtex", extensions: [".bib"], aliases: ["BibTeX"] });
+  monaco.editor.defineTheme("latex-light", { base: "vs", inherit: true, rules: [], colors: {} });
+  monaco.editor.defineTheme("latex-dark", {
+    base: "vs-dark", inherit: true, rules: [],
+    colors: { "editor.background": "#26272b", "editorGutter.background": "#26272b" },
+  });
+  applyTheme();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+
+  editor = monaco.editor.create(editorEl, {
+    model: null,
+    automaticLayout: true,
+    fontFamily: '"Cascadia Code", "Cascadia Mono", Consolas, monospace',
+    fontSize: 14,
+    lineHeight: 21,
+    wordWrap: "on",
+    wrappingIndent: "same",
+    tabSize: 2,
+    minimap: { enabled: true, renderCharacters: false },
+    scrollBeyondLastLine: false,
+    renderLineHighlight: "all",
+    smoothScrolling: true,
+    // Accented letters (Catalan/Spanish) are normal text, not suspicious characters.
+    unicodeHighlight: { ambiguousCharacters: false, invisibleCharacters: true },
+    fixedOverflowWidgets: true,
+  });
+  editor.onDidChangeCursorPosition((e) => handlers.onCursor(e.position));
+  updateView();
+  return monaco;
+}
+
+export function setProjectOpen(open) {
+  projectOpen = open;
+  updateView();
+}
+
+// ---------------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------------
+
+const isDirty = (tab) => tab.kind === "text" && tab.model.getAlternativeVersionId() !== tab.savedVersion;
+
+export function anyDirty() {
+  return [...tabs.values()].some(isDirty);
+}
+
+function notifyDirty() {
+  const dirty = anyDirty();
+  if (dirty !== lastDirty) {
+    lastDirty = dirty;
+    handlers.onDirtyChange(dirty);
+  }
+}
+
+// focus: move keyboard focus to the editor (false keeps it in the file tree).
+export function openTab(path, data, { focus = true } = {}) {
+  if (!tabs.has(path)) {
+    const tab = { path, kind: data.kind, data, encoding: data.encoding, viewState: null };
+    if (data.kind === "text") {
+      const language = LANGUAGE_BY_EXT[extOf(path)] || "plaintext";
+      const uri = monaco.Uri.parse(`inmemory://tab/${++modelCounter}/${encodeURIComponent(nameOf(path))}`);
+      tab.model = monaco.editor.createModel(data.text, language, uri);
+      tab.savedVersion = tab.model.getAlternativeVersionId();
+      tab.model.onDidChangeContent(() => {
+        renderTabs();
+        notifyDirty();
+      });
+    }
+    tabs.set(path, tab);
+  }
+  activate(path, { focus });
+}
+
+export const isOpen = (path) => tabs.has(path);
+export const getActivePath = () => activePath;
+export const openPaths = () => [...tabs.keys()];
+
+export function activate(path, { focus = true } = {}) {
+  const current = tabs.get(activePath);
+  if (current?.kind === "text") current.viewState = editor.saveViewState();
+  activePath = tabs.has(path) ? path : null;
+  const tab = tabs.get(activePath);
+  if (tab?.kind === "text") {
+    editor.setModel(tab.model);
+    if (tab.viewState) editor.restoreViewState(tab.viewState);
+    if (focus) editor.focus();
+    handlers.onCursor(editor.getPosition());
+  } else {
+    editor.setModel(null);
+    handlers.onCursor(null);
+  }
+  updateView();
+  renderTabs();
+  handlers.onActiveChange(activePath);
+}
+
+export function cycleTab(step) {
+  const paths = openPaths();
+  if (paths.length < 2) return;
+  const i = paths.indexOf(activePath);
+  activate(paths[(i + step + paths.length) % paths.length]);
+}
+
+function dropTab(path) {
+  const tab = tabs.get(path);
+  if (!tab) return;
+  const paths = openPaths();
+  const index = paths.indexOf(path);
+  tabs.delete(path);
+  if (activePath === path) {
+    activePath = null; // don't save view state of the closing tab
+    const next = paths[index + 1] ?? paths[index - 1] ?? null;
+    activate(next && tabs.has(next) ? next : null);
+  }
+  tab.model?.dispose();
+  renderTabs();
+  notifyDirty();
+}
+
+export async function closeTab(path, { force = false } = {}) {
+  const tab = tabs.get(path);
+  if (!tab) return true;
+  if (!force && isDirty(tab)) {
+    const discard = await confirmDialog({
+      title: "Unsaved changes",
+      message: `${nameOf(path)} has unsaved changes. Close it and discard them?`,
+      okLabel: "Discard changes",
+      danger: true,
+    });
+    if (!discard) return false;
+  }
+  dropTab(path);
+  return true;
+}
+
+export function closeAll() {
+  for (const path of openPaths()) dropTab(path);
+}
+
+// Close tabs for a deleted file or folder (and everything below it).
+export function closeUnder(rel) {
+  for (const path of openPaths()) {
+    if (path === rel || path.startsWith(rel + "/")) dropTab(path);
+  }
+}
+
+// Follow a rename of a file or folder.
+export function renamePaths(oldRel, newRel) {
+  const entries = [...tabs.entries()].map(([path, tab]) => {
+    if (path === oldRel || path.startsWith(oldRel + "/")) {
+      tab.path = newRel + path.slice(oldRel.length);
+      if (tab.model) monaco.editor.setModelLanguage(tab.model, LANGUAGE_BY_EXT[extOf(tab.path)] || "plaintext");
+      if (activePath === path) activePath = tab.path;
+    }
+    return [tab.path, tab];
+  });
+  tabs.clear();
+  for (const [path, tab] of entries) tabs.set(path, tab);
+  renderTabs();
+  handlers.onActiveChange(activePath);
+}
+
+// Files with unsaved edits: [{ path, text, encoding, version }]
+export function dirtyFiles() {
+  return [...tabs.values()].filter(isDirty).map((tab) => ({
+    path: tab.path,
+    text: tab.model.getValue(),
+    encoding: tab.encoding,
+    version: tab.model.getAlternativeVersionId(),
+  }));
+}
+
+// Record a successful save of the content as it was at `version`.
+export function markSaved(path, version, encoding) {
+  const tab = tabs.get(path);
+  if (!tab) return;
+  tab.savedVersion = version;
+  if (encoding) tab.encoding = encoding;
+  renderTabs();
+  notifyDirty();
+}
+
+export function focusEditor() {
+  if (tabs.get(activePath)?.kind === "text") editor.focus();
+}
+
+export function revealLine(line) {
+  editor.revealLineInCenter(line);
+  editor.setPosition({ lineNumber: line, column: 1 });
+  editor.focus();
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+
+function updateView() {
+  const tab = tabs.get(activePath);
+  editorEl.hidden = tab?.kind !== "text";
+  fileViewEl.hidden = !tab || tab.kind === "text";
+  noFileEl.hidden = !projectOpen || !!tab;
+  if (tab && tab.kind !== "text") {
+    fileViewEl.replaceChildren();
+    if (tab.kind === "image") {
+      const img = document.createElement("img");
+      img.src = tab.data.url;
+      img.alt = nameOf(tab.path);
+      fileViewEl.append(img);
+    } else {
+      const p = document.createElement("p");
+      p.className = "empty-state";
+      p.textContent = `${nameOf(tab.path)} is a binary file (${(tab.data.size / 1024).toFixed(0)} KB) and can't be shown here.`;
+      fileViewEl.append(p);
+    }
+  }
+}
+
+function renderTabs() {
+  const names = openPaths().map(nameOf);
+  tabsEl.replaceChildren();
+  for (const tab of tabs.values()) {
+    const name = nameOf(tab.path);
+    const el = document.createElement("div");
+    el.className = "tab";
+    el.classList.toggle("active", tab.path === activePath);
+    el.classList.toggle("dirty", isDirty(tab));
+    el.setAttribute("role", "tab");
+    el.setAttribute("aria-selected", tab.path === activePath);
+    el.title = tab.path;
+
+    const label = document.createElement("span");
+    label.className = "tab-label";
+    label.textContent = name;
+    // Same file name open twice: show the folder to tell them apart.
+    if (names.filter((n) => n === name).length > 1 && tab.path.includes("/")) {
+      const dir = document.createElement("small");
+      dir.textContent = tab.path.slice(0, tab.path.lastIndexOf("/"));
+      label.append(dir);
+    }
+
+    const close = document.createElement("button");
+    close.className = "tab-close";
+    close.title = "Close (Ctrl+W)";
+    close.setAttribute("aria-label", `Close ${name}`);
+    close.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeTab(tab.path);
+    });
+
+    el.append(label, close);
+    el.addEventListener("click", () => activate(tab.path));
+    el.addEventListener("auxclick", (e) => {
+      if (e.button === 1) closeTab(tab.path);
+    });
+    tabsEl.append(el);
+  }
+  tabsEl.querySelector(".tab.active")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}

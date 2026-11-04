@@ -56,6 +56,8 @@ latexeditor/
     __main__.py      # `python -m app`
     main.py          # entry point: starts PDF server, creates window
     api.py           # class exposed to JS (open/save/compile/search/...)
+    errors.py        # UserError: messages shown to the user as-is
+    fsutil.py        # Documents/AppData folders, Recycle Bin, atomic writes
     workspace.py     # import .zip, recent projects, file ops, export .zip
     project.py       # per-project settings (.latexeditor.json), main-file detection
     builder.py       # LuaLaTeX build orchestrator
@@ -70,7 +72,8 @@ latexeditor/
     js/
       app.js         # bootstrap: toolbar, panels, shortcuts, status bar
       layout.js      # resizable/collapsible panes, remembered in localStorage
-      bridge.js      # promise wrapper around window.pywebview.api
+      bridge.js      # promise wrapper around window.pywebview.api (or dev_server.py with ?dev)
+      ui.js          # toasts, modal dialogs, context menus
       filetree.js
       editor.js      # Monaco setup, tabs, dirty state, save
       latex-lang.js  # Monarch tokenizer for LaTeX/BibTeX
@@ -85,7 +88,8 @@ latexeditor/
   scripts/
     fetch_vendor.py
     smoke_test.py    # lualatex + pywebview + vendor libraries end-to-end check
-    ui_check.py      # launches the real app window and probes the UI via JS
+    ui_check.py      # launches the real app window and drives the UI via JS
+    dev_server.py    # serves web/ + the real Api over HTTP for browser-based UI work
   tests/
     fixtures/        # small sample projects as .zip
   requirements.txt
@@ -176,7 +180,7 @@ Each phase ends with something runnable and is tested before moving on.
 |---|---|---|
 | 0 | **Setup** ✅ | `git init`, venv, `requirements.txt` / `requirements-dev.txt`, `fetch_vendor.py` downloads Monaco + PDF.js + typo.js + dictionaries, `smoke_test.py` passes |
 | 1 | **Window & layout** ✅ | App opens a window with file tree · editor · PDF, draggable splitters, toolbar, status bar; `ui_check.py` passes |
-| 2 | **Projects** | Import `.zip`, workspace folder, Recent Projects, file tree (open/new/rename/delete/upload image), tabs, Ctrl+S save, Export `.zip`, main-file detection |
+| 2 | **Projects** ✅ | Import `.zip`, workspace folder, Recent Projects, file tree (open/new/rename/delete to Recycle Bin/add files), tabs, Ctrl+S save, Export `.zip`, main-file detection, unsaved-changes guard on quit |
 | 3 | **Compile & PDF** | Build pipeline with LuaLaTeX + biber/BibTeX + glossaries/index; PDF shown on the right, keeps page/zoom after recompile; zoom/fit controls |
 | 4 | **Error panel** | Parsed errors/warnings, markers in editor, click-to-jump, raw log view |
 | 5 | **Editor intelligence** | LaTeX highlighting, autocomplete (commands, envs, refs, cites, paths), snippets |

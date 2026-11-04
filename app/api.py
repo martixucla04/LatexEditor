@@ -1,15 +1,25 @@
 """Python functions exposed to the web UI as window.pywebview.api.*
 
 pywebview exposes every public method and walks public attributes, so internal
-state is kept in underscore-prefixed attributes.
+state is kept in underscore-prefixed attributes. Each call runs in its own
+thread; exceptions reject the JS promise (UserError messages are shown as-is).
 """
 
 import platform
 import shutil
 import subprocess
+import sys
 from importlib.metadata import version
+from pathlib import Path
+
+import webview
 
 from . import __version__
+from .errors import UserError
+from .fsutil import reveal_in_explorer
+from .project import Project
+from .settings import Settings
+from .workspace import export_zip, import_zip
 
 
 def detect_engine():
@@ -19,21 +29,55 @@ def detect_engine():
         return None
     try:
         out = subprocess.run([path, "--version"], capture_output=True, text=True,
-                             encoding="utf-8", errors="replace", timeout=20).stdout
+                             encoding="utf-8", errors="replace", timeout=20,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
     except (OSError, subprocess.TimeoutExpired):
         out = ""
     banner = out.splitlines()[0].strip() if out else "version unknown"
     return {"path": path, "version": banner.removeprefix("This is ").strip()}
 
 
+def ask_yes_no(title: str, message: str) -> bool:
+    """Native Yes/No box; safe to call from the GUI thread (used while closing)."""
+    if sys.platform != "win32":
+        return True
+    import ctypes
+
+    MB_YESNO, MB_ICONWARNING, IDYES = 0x4, 0x30, 6
+    return ctypes.windll.user32.MessageBoxW(None, message, title, MB_YESNO | MB_ICONWARNING) == IDYES
+
+
 class Api:
-    def __init__(self):
+    def __init__(self, settings: Settings | None = None):
         self._window = None
         self._engine = None
+        self._settings = settings or Settings()
+        self._project: Project | None = None
+        self._dirty = False
 
-    def attach(self, window):
-        """Called by main.py once the window exists (not exposed: underscore state only)."""
+    def _attach(self, window):
+        """Called by main.py once the window exists."""
         self._window = window
+        window.events.closing += self._on_closing
+
+    def _on_closing(self):
+        if self._dirty and not ask_yes_no("LaTeX Editor", "You have unsaved changes. Quit without saving?"):
+            return False  # cancels the close
+        return True
+
+    def _require_project(self) -> Project:
+        if self._project is None:
+            raise UserError("No project is open.")
+        return self._project
+
+    def _open(self, root: Path) -> dict:
+        self._project = Project(root)
+        self._settings.add_recent(self._project.root, self._project.name)
+        if self._window is not None:
+            self._window.title = f"{self._project.name} - LaTeX Editor"
+        return self._project.info()
+
+    # -- app -------------------------------------------------------------------
 
     def app_info(self):
         if self._engine is None:
@@ -43,4 +87,87 @@ class Api:
             "python": platform.python_version(),
             "pywebview": version("pywebview"),
             "engine": self._engine or None,
+            "workspace": str(self._settings.workspace),
         }
+
+    def set_dirty(self, dirty: bool):
+        """The UI reports whether any open file has unsaved changes."""
+        self._dirty = bool(dirty)
+
+    # -- projects ----------------------------------------------------------------
+
+    def recent_projects(self):
+        return self._settings.recent()
+
+    def remove_recent(self, path: str):
+        self._settings.remove_recent(path)
+        return self._settings.recent()
+
+    def import_zip_dialog(self):
+        paths = self._window.create_file_dialog(webview.FileDialog.OPEN, file_types=("ZIP archives (*.zip)",))
+        if not paths:
+            return None
+        return self.import_zip(paths[0])
+
+    def import_zip(self, zip_path: str):
+        return self._open(import_zip(Path(zip_path), self._settings.workspace))
+
+    def open_project(self, path: str):
+        return self._open(Path(path))
+
+    def close_project(self):
+        self._project = None
+        if self._window is not None:
+            self._window.title = "LaTeX Editor"
+
+    def project_info(self):
+        return self._require_project().info()
+
+    def export_zip_dialog(self, include_pdf: bool = False):
+        project = self._require_project()
+        dest = self._window.create_file_dialog(
+            webview.FileDialog.SAVE, save_filename=f"{project.name}.zip", file_types=("ZIP archives (*.zip)",)
+        )
+        if not dest:
+            return None
+        dest = Path(dest[0] if isinstance(dest, (list, tuple)) else dest)
+        if dest.suffix.lower() != ".zip":
+            dest = dest.with_name(dest.name + ".zip")
+        count = export_zip(project.root, dest, project.pdf_path if include_pdf else None)
+        return {"path": str(dest), "count": count}
+
+    def reveal(self, rel: str = ""):
+        reveal_in_explorer(self._require_project().path(rel))
+
+    # -- files -------------------------------------------------------------------
+
+    def tree(self):
+        return self._require_project().tree()
+
+    def read_file(self, rel: str):
+        return self._require_project().read_file(rel)
+
+    def save_file(self, rel: str, text: str, encoding: str = "utf-8"):
+        return self._require_project().write_file(rel, text, encoding)
+
+    def create_file(self, parent_rel: str, name: str):
+        return self._require_project().create_file(parent_rel, name)
+
+    def create_folder(self, parent_rel: str, name: str):
+        return self._require_project().create_folder(parent_rel, name)
+
+    def rename_path(self, rel: str, new_name: str):
+        return self._require_project().rename(rel, new_name)
+
+    def delete_path(self, rel: str):
+        self._require_project().delete(rel)
+
+    def add_files_dialog(self, parent_rel: str = ""):
+        project = self._require_project()
+        paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
+        return project.add_files(parent_rel, list(paths)) if paths else []
+
+    def set_main_file(self, rel: str):
+        project = self._require_project()
+        project.set_main_file(rel)
+        return project.info()

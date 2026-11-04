@@ -30,8 +30,14 @@ python -m venv .venv
 .\.venv\Scripts\python scripts\ui_check.py   # opens the app window, checks layout + backend, closes it
 ```
 
-To work on the UI in a normal browser (no Python backend), serve `web/`:
-`python -m http.server 8765 --directory web`.
+To work on the UI in a normal browser with the real Python API behind it:
+
+```powershell
+.\.venv\Scripts\python scripts\dev_server.py   # then open http://127.0.0.1:8765/index.html?dev
+```
+
+It uses a temporary workspace; native file dialogs are answered from a queue
+(`POST /dev/dialog {"result": [...]}`).
 
 ## Check the setup
 

@@ -35,17 +35,17 @@ def create_window(api):
         min_size=(960, 600),
         background_color=BACKGROUND[system_theme()],
     )
-    api.attach(window)
+    api._attach(window)
     return window
 
 
-def run(debug=False, func=None, args=None):
+def run(debug=False, func=None, args=None, api=None):
     """Create the window and block until it closes.
 
     `func(*args)` runs in a background thread once the GUI loop has started
-    (used by scripts/ui_check.py to drive the window).
+    (used by scripts/ui_check.py to drive the window, with its own `api`).
     """
-    api = Api()
+    api = api or Api()
     window = create_window(api)
     if func is not None:
         webview.start(func, (window, *(args or ())), http_server=True, debug=debug)
