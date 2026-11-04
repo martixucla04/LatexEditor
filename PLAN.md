@@ -53,6 +53,7 @@ PyInstaller 6.22.3.
 ```
 latexeditor/
   app/
+    __main__.py      # `python -m app`
     main.py          # entry point: starts PDF server, creates window
     api.py           # class exposed to JS (open/save/compile/search/...)
     workspace.py     # import .zip, recent projects, file ops, export .zip
@@ -67,7 +68,8 @@ latexeditor/
     index.html
     css/app.css
     js/
-      app.js         # layout, splitters, toolbar, shortcuts, status bar
+      app.js         # bootstrap: toolbar, panels, shortcuts, status bar
+      layout.js      # resizable/collapsible panes, remembered in localStorage
       bridge.js      # promise wrapper around window.pywebview.api
       filetree.js
       editor.js      # Monaco setup, tabs, dirty state, save
@@ -83,6 +85,7 @@ latexeditor/
   scripts/
     fetch_vendor.py
     smoke_test.py    # lualatex + pywebview + vendor libraries end-to-end check
+    ui_check.py      # launches the real app window and probes the UI via JS
   tests/
     fixtures/        # small sample projects as .zip
   requirements.txt
@@ -172,7 +175,7 @@ Each phase ends with something runnable and is tested before moving on.
 | # | Phase | Deliverable / done when |
 |---|---|---|
 | 0 | **Setup** ✅ | `git init`, venv, `requirements.txt` / `requirements-dev.txt`, `fetch_vendor.py` downloads Monaco + PDF.js + typo.js + dictionaries, `smoke_test.py` passes |
-| 1 | **Window & layout** | App opens a window with file tree · editor · PDF, draggable splitters, toolbar, status bar |
+| 1 | **Window & layout** ✅ | App opens a window with file tree · editor · PDF, draggable splitters, toolbar, status bar; `ui_check.py` passes |
 | 2 | **Projects** | Import `.zip`, workspace folder, Recent Projects, file tree (open/new/rename/delete/upload image), tabs, Ctrl+S save, Export `.zip`, main-file detection |
 | 3 | **Compile & PDF** | Build pipeline with LuaLaTeX + biber/BibTeX + glossaries/index; PDF shown on the right, keeps page/zoom after recompile; zoom/fit controls |
 | 4 | **Error panel** | Parsed errors/warnings, markers in editor, click-to-jump, raw log view |

@@ -17,6 +17,22 @@ python -m venv .venv
 .\.venv\Scripts\python scripts\fetch_vendor.py
 ```
 
+## Run
+
+```powershell
+.\.venv\Scripts\python -m app            # add --debug for the WebView developer tools
+```
+
+## Tests
+
+```powershell
+.\.venv\Scripts\python -m pytest         # unit tests
+.\.venv\Scripts\python scripts\ui_check.py   # opens the app window, checks layout + backend, closes it
+```
+
+To work on the UI in a normal browser (no Python backend), serve `web/`:
+`python -m http.server 8765 --directory web`.
+
 ## Check the setup
 
 ```powershell

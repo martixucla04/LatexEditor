@@ -1,0 +1,404 @@
+/* ---------------------------------------------------------------------
+   Theme tokens. Light by default, dark follows the system setting.
+   A manual theme switch (data-theme on <html>) comes in phase 9.
+   --------------------------------------------------------------------- */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-alt: #f0f1f4;
+  --border: #dfe1e6;
+  --text: #1f2328;
+  --text-muted: #656d76;
+  --accent: #2f6feb;
+  --accent-text: #ffffff;
+  --accent-soft: rgba(47, 111, 235, 0.12);
+  --compile: #1f883d;
+  --compile-hover: #1a7f37;
+  --danger: #cf222e;
+  --warning: #9a6700;
+  --splitter-hover: var(--accent);
+
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, monospace;
+
+  --toolbar-h: 44px;
+  --statusbar-h: 24px;
+  --pane-header-h: 32px;
+
+  /* Pane sizes, overwritten by layout.js */
+  --sidebar-w: 240px;
+  --pdf-w: 560px;
+  --panel-h: 180px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1e1f22;
+    --surface: #26272b;
+    --surface-alt: #2d2e33;
+    --border: #393b41;
+    --text: #e3e5e8;
+    --text-muted: #9aa0a8;
+    --accent: #4c8dff;
+    --accent-soft: rgba(76, 141, 255, 0.16);
+    --compile: #2ea043;
+    --compile-hover: #3fb950;
+    --danger: #f85149;
+    --warning: #d29922;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1e1f22;
+  --surface: #26272b;
+  --surface-alt: #2d2e33;
+  --border: #393b41;
+  --text: #e3e5e8;
+  --text-muted: #9aa0a8;
+  --accent: #4c8dff;
+  --accent-soft: rgba(76, 141, 255, 0.16);
+  --compile: #2ea043;
+  --compile-hover: #3fb950;
+  --danger: #f85149;
+  --warning: #d29922;
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 var(--font-ui);
+}
+
+body {
+  display: grid;
+  grid-template-rows: var(--toolbar-h) 1fr var(--statusbar-h);
+  user-select: none;
+}
+
+button { font: inherit; color: inherit; }
+code, kbd { font-family: var(--font-mono); font-size: 0.92em; }
+[hidden] { display: none !important; }
+.spacer { flex: 1; }
+
+.empty-state {
+  margin: 0;
+  padding: 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------------
+   Toolbar
+   --------------------------------------------------------------------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+
+.logo {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.project-name {
+  max-width: 280px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-name.open { color: var(--text); }
+
+.tb-group { display: flex; align-items: center; gap: 2px; }
+
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tb-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tb-btn svg.filled { fill: currentColor; stroke: none; }
+.tb-btn:hover:not(:disabled) { background: var(--surface-alt); }
+.tb-btn:disabled { opacity: 0.45; cursor: default; }
+.tb-btn.icon-only { width: 30px; padding: 0; justify-content: center; }
+.tb-btn.small { width: 24px; height: 24px; }
+.tb-btn[aria-pressed="true"] { color: var(--accent); }
+
+.tb-btn.primary {
+  padding: 0 14px;
+  background: var(--compile);
+  color: #fff;
+  font-weight: 600;
+}
+
+.tb-btn.primary:hover:not(:disabled) { background: var(--compile-hover); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------------------------------------------------------------------
+   Workbench grid
+   --------------------------------------------------------------------- */
+.workbench {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 5px minmax(0, 1fr) 5px var(--pdf-w);
+  grid-template-areas: "sidebar split-sidebar editor split-pdf pdf";
+  min-height: 0;
+}
+
+/* Named areas keep panes in their columns when the sidebar is display:none. */
+#sidebar { grid-area: sidebar; }
+#split-sidebar { grid-area: split-sidebar; }
+#editor-column { grid-area: editor; }
+#split-pdf { grid-area: split-pdf; }
+#pdf-pane { grid-area: pdf; }
+
+.workbench.sidebar-hidden { grid-template-columns: 0 0 minmax(0, 1fr) 5px var(--pdf-w); }
+.workbench.sidebar-hidden .sidebar,
+.workbench.sidebar-hidden #split-sidebar { display: none; }
+
+.sidebar, .editor-column, .pdf-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.pane-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 var(--pane-header-h);
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.pane-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pane-body { flex: 1; min-height: 0; overflow: auto; }
+
+/* ---------------------------------------------------------------------
+   Splitters
+   --------------------------------------------------------------------- */
+.splitter {
+  position: relative;
+  background: var(--border);
+  background-clip: content-box;
+  z-index: 1;
+}
+
+.splitter.vertical { padding: 0 2px; cursor: col-resize; }
+.splitter.horizontal { flex: 0 0 5px; padding: 2px 0; cursor: row-resize; }
+
+.splitter:hover, .splitter.dragging {
+  background-color: var(--splitter-hover);
+  padding: 0;
+}
+
+.splitter.horizontal:hover, .splitter.horizontal.dragging { padding: 1px 0; }
+
+body.resizing-col { cursor: col-resize; }
+body.resizing-row { cursor: row-resize; }
+body.resizing-col iframe, body.resizing-row iframe,
+body.resizing-col .pdf-viewer, body.resizing-row .editor { pointer-events: none; }
+
+/* ---------------------------------------------------------------------
+   Editor column
+   --------------------------------------------------------------------- */
+.tabs {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow-x: auto;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs:empty { display: none; }
+
+.editor-area { position: relative; flex: 1; min-height: 0; }
+.editor { position: absolute; inset: 0; }
+
+.welcome {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 48px 56px;
+  user-select: text;
+}
+
+.welcome > * { max-width: 560px; }
+.welcome h1 { margin: 0 0 8px; font-size: 26px; font-weight: 600; }
+.welcome h2 {
+  margin: 32px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.welcome .lead { margin: 0 0 20px; color: var(--text-muted); font-size: 14px; }
+
+.btn {
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.btn.primary { border-color: transparent; background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.recent { margin: 0; padding: 0; list-style: none; }
+.recent .empty-state { padding: 0; text-align: left; }
+
+.shortcuts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.shortcuts dt { white-space: nowrap; }
+.shortcuts dd { margin: 0; color: var(--text-muted); }
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface-alt);
+}
+
+.engine-line { margin-top: 32px; color: var(--text-muted); font-size: 12px; }
+.engine-line.ok::before { content: "● "; color: var(--compile); }
+.engine-line.missing { color: var(--danger); }
+
+/* Problems / log panel */
+.panel {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 var(--panel-h);
+  min-height: 0;
+}
+
+.panel .pane-header { gap: 2px; padding: 0 6px; }
+
+.panel-tab {
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.panel-tab:hover { color: var(--text); }
+.panel-tab.active { background: var(--surface-alt); color: var(--text); }
+
+.badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--surface-alt);
+  font-size: 11px;
+  text-align: center;
+}
+
+.panel-tab.active .badge { background: var(--border); }
+.pane-body.log { font: 12px/1.5 var(--font-mono); user-select: text; }
+
+.editor-column.panel-hidden .panel,
+.editor-column.panel-hidden #split-panel { display: none; }
+
+/* ---------------------------------------------------------------------
+   PDF pane
+   --------------------------------------------------------------------- */
+.pdf-toolbar { gap: 4px; }
+.page-indicator, .zoom-value { min-width: 44px; color: var(--text-muted); font-size: 12px; text-align: center; }
+
+.pdf-viewer {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface-alt);
+  display: grid;
+  place-items: center;
+}
+
+/* ---------------------------------------------------------------------
+   Status bar
+   --------------------------------------------------------------------- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.statusbar .warning { color: var(--warning); }
