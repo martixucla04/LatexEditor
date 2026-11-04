@@ -29,7 +29,7 @@ export const ACTIONS = [
   ["itemize", "•≡", "Bulleted list (selected lines become items)", () => editor.makeList("itemize")],
   ["enumerate", "1≡", "Numbered list (selected lines become items)", () => editor.makeList("enumerate")],
   ["section", "§", "Section heading \\section", wrap("\\section{")],
-  ["reference", "<code>[1]</code>", "Add a web reference to the bibliography and \\cite it here (Ctrl+Shift+R)", openReferenceDialog],
+  ["reference", "<code>[1]</code>", "Add a reference (book, article, standard, web page…) to the bibliography and \\cite it here (Ctrl+Shift+R)", openReferenceDialog],
   ["comment", "%", "Comment / uncomment lines (Ctrl+/)", () => editor.runAction("editor.action.commentLine")],
 ];
 

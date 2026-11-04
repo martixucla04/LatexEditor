@@ -932,6 +932,22 @@ kbd {
 .ref-field span { display: flex; flex-direction: column; }
 .ref-field small { color: var(--text-muted); font-size: 11px; }
 
+.modal.references form { max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
+.ref-fields { overflow: auto; min-height: 0; padding-right: 4px; }
+.modal label.ref-field.checkbox input { justify-self: start; width: 16px; height: 16px; accent-color: var(--accent); }
+.modal label.ref-kind-row { padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+
+.ref-kind {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+}
+
 .ref-field input {
   height: 30px;
   padding: 0 8px;

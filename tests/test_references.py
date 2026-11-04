@@ -160,6 +160,47 @@ def test_bibtex_ieeetran_prints_the_house_format(make_project):
     assert "\\phantom{.}." not in bbl
 
 
+ALL_TYPES = {
+    "book": {"authors": "Bragós Bardia, Ramon", "etal": True, "title": "Circuitos y dispositivos electrónicos",
+             "subtitle": "fundamentos", "edition": "4", "place": "Barcelona", "publisher": "Edicions UPC",
+             "year": "1994", "extent": "463", "collection": "Politext", "collection_number": "35",
+             "chapter": "Capítol 3. Circuitos lineales", "chapter_pages": "35-57", "isbn": "84-8301-215-4"},
+    "part": {"authors": "Alcaide, C.", "part_title": "L'euro", "book_title": "L'impacte de l'euro", "year": "1998",
+             "place": "Barcelona", "publisher": "La Caixa", "part_pages": "13-37", "isbn": "84-1"},
+    "standard": {"entity": "AENOR", "title": "Términos generales", "code": "UNE 0-007-91", "place": "Madrid",
+                 "publisher": "AENOR", "year": "1991"},
+    "catalogue": {"company": "Ariston", "title": "Catálogo general núm. 8", "publisher": "Ariston", "year": "[1999]"},
+    "periodical": {"title": "Electronic design", "place": "Cleveland", "numbering": "Vol. 47 (1999), 26", "issn": "0013-4872"},
+    "article": {"authors": "Kennard, L.", "title": "Is it secure?", "journal": "Netware connection", "volume": "11",
+                "year": "2000", "issue": "1", "pages": "6-20", "issn": "1076-3422"},
+    "newspaper": {"authors": "Capdevila, J.", "title": "Els llibreters", "newspaper": "Avui", "place": "Barcelona",
+                  "date": "10 de febrer del 2000", "issue": "8.026", "pages": "33"},
+    "official": {"title": "Ley Orgánica 10/1995", "gazette": "Boletín Oficial del Estado", "date": "24 noviembre 1995",
+                 "issue": "281", "pages": "33987-34058"},
+    "web": FIELDS,
+}
+
+
+@pytest.mark.latex
+@pytest.mark.skipif(__import__("shutil").which("lualatex") is None, reason="lualatex not installed")
+@pytest.mark.parametrize("setup", ["thebibliography", "bibtex"])
+def test_every_reference_type_compiles(make_project, setup):
+    from app.builder import Builder
+    from app.references import add_reference
+
+    root = make_project(BIBTEX_PROJECT if setup == "bibtex" else {"main.tex": DOC})
+    project = Project(root)
+    keys = [add_reference(project, kind, fields)["key"] for kind, fields in ALL_TYPES.items()]
+    main = (root / "main.tex").read_text(encoding="utf-8")
+    cite = "\\cite{" + ",".join(keys) + "}"
+    main = main.replace("\\cite{FSGrules}", cite) if setup == "bibtex" else main.replace("\\cite{x}", cite)
+    (root / "main.tex").write_text(main, encoding="utf-8")
+    result = Builder(root, "main.tex").run()
+    assert result.status == "success", [p["message"] for p in result.problems]
+    aux = (root / ".build" / "main.aux").read_text(encoding="utf-8")
+    assert all(f"\\bibcite{{{k}}}" in aux for k in keys)
+
+
 @pytest.mark.latex
 @pytest.mark.skipif(__import__("shutil").which("lualatex") is None, reason="lualatex not installed")
 def test_biblatex_reference_compiles(make_project):

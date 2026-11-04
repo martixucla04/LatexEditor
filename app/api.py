@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from . import __version__, references, search, synctex
+from . import __version__, references, reftypes, search, synctex
 from .builder import Builder, BuildResult
 from .completions import scan_project
 from .errors import UserError
@@ -260,17 +260,20 @@ class Api:
                               bool(o.get("case")), bool(o.get("word")),
                               o.get("include") or search.DEFAULT_INCLUDE, files)
 
-    def preview_web_reference(self, fields: dict):
+    def reference_types(self):
+        """Reference types and their fields, for the Add reference dialog."""
+        return reftypes.types()
+
+    def preview_reference(self, kind: str, fields: dict):
         """Formatted text and a free citation key for the Add reference dialog."""
         project = self._require_project()
-        text = references.format_web_reference(fields.get("author"), fields.get("consulted"), fields.get("title"),
-                                               fields.get("medium"), fields.get("url"))
-        key = fields.get("key") or references.suggest_key(fields.get("author"), fields.get("consulted"))
+        text = reftypes.format_reference(kind, fields)
+        key = fields.get("key") or references.suggest_key_for(kind, fields)
         return {"text": text, "key": references.unique_key(key, references.existing_keys(project))}
 
-    def add_web_reference(self, fields: dict):
-        """Add a web reference as a \\bibitem (see app/references.py)."""
-        return references.add_web_reference(self._require_project(), fields)
+    def add_reference(self, kind: str, fields: dict):
+        """Add a reference to the bibliography (see app/references.py)."""
+        return references.add_reference(self._require_project(), kind, fields)
 
     def spell_settings(self):
         """{language: "en"|"ca"|"es"|"off", words: [project dictionary]}"""

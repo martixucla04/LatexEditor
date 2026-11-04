@@ -263,6 +263,13 @@ Each phase ends with something runnable and is tested before moving on.
 - Side panel minimum width 200 px (its header needs ~194 px; at 160 px the upload button stuck
   out of the panel); the header clips instead of overflowing.
 - Toolbar **Recent** menu (Ctrl+Shift+O) and "Reopen the last project at startup" (default on).
+- **Reference types** (`reftypes.py`): book (optional same-author chapter line, ISBN on a new
+  line), part of a book, standard, commercial catalogue ([S.l.] for an unknown place),
+  periodical, journal article (ISSN line), newspaper article, official publication, web page.
+  One definition gives both the dialog's fields (with defaults such as today's date) and the
+  formatter; every example of the style guide is a test. Authors "Cognoms, Nom; …" get capital
+  surnames, "et al." is a checkbox, a bare edition/extent number becomes "4ª ed."/"463 p.",
+  straight apostrophes become ’, line breaks inside an entry are `\newline`.
 - **Add web reference** (`references.py`, `references.js`): house format
   `Autor (Pàgina consultada <data>). Títol, [suport]. Adreça URL: \url{…}` with Catalan dates
   (l’1/l’11, el 2…, d’abril/d’agost/d’octubre); added as `\bibitem` before

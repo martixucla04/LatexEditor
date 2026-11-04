@@ -1,13 +1,8 @@
-"""Web references in the house style, added to the document's bibliography.
+"""References in the house style, added to the document's bibliography.
 
-Format (one \\bibitem in thebibliography):
-
-    Autor (Pàgina consultada <data>). Títol de la pàgina, [tipus de suport]. Adreça URL: <url>
-
-    SIEMENS (Pàgina consultada l’11 de febrer de 2000). SIEMENS. Productos y soluciones,
-    [En línia]. Adreça URL: http://www.siemens.es/html/prodsolu/prodserv.html
-
-Where it goes depends on how the document makes its bibliography:
+The text of each entry comes from app/reftypes.py (books, parts of books, standards,
+catalogues, periodicals, journal and newspaper articles, official publications, web
+pages). Where it goes depends on how the document makes its bibliography:
 - biblatex (\\addbibresource) or BibTeX (\\bibliography): an @misc entry in that .bib
   whose `note` is the formatted text, which every style prints as-is;
 - otherwise a \\bibitem before \\end{thebibliography} in the project file that has one,
@@ -18,19 +13,11 @@ project loads url or hyperref.
 
 import re
 import unicodedata
-from datetime import date
 
 from .errors import UserError
 from .project import Project
+from .reftypes import catalan_date, escape_latex, format_reference, key_parts  # noqa: F401 (re-exported)
 from .workspace import iter_project_files
-
-MONTHS = ["gener", "febrer", "març", "abril", "maig", "juny", "juliol", "agost",
-          "setembre", "octubre", "novembre", "desembre"]
-
-LATEX_SPECIALS = {
-    "\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#", "_": r"\_",
-    "{": r"\{", "}": r"\}", "~": r"\textasciitilde{}", "^": r"\textasciicircum{}",
-}
 
 BIBITEM = re.compile(r"\\bibitem\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}")
 END_THEBIBLIOGRAPHY = re.compile(r"^[ \t]*\\end\{thebibliography\}", re.M)
@@ -43,44 +30,22 @@ PRINTBIBLIOGRAPHY = re.compile(r"^[^%\n]*\\printbibliography", re.M)
 BIB_KEY = re.compile(r"@\s*[A-Za-z]+\s*[{(]\s*([^,\s{}()]+)\s*,")
 
 
-def catalan_date(d: date) -> str:
-    """'l’11 de febrer de 2000', 'el 2 d’abril de 2024' (apostrophe before 1, 11 and vowels)."""
-    day = f"l’{d.day}" if d.day in (1, 11) else f"el {d.day}"
-    month = MONTHS[d.month - 1]
-    article = "d’" if month[0] in "aeiou" else "de "
-    return f"{day} {article}{month} de {d.year}"
-
-
-def escape_latex(text: str) -> str:
-    return "".join(LATEX_SPECIALS.get(ch, ch) for ch in text)
-
-
-def _clean(field: str, name: str) -> str:
-    value = re.sub(r"\s+", " ", (field or "")).strip()
-    if not value:
-        raise UserError(f"The {name} is required.")
-    return value
-
-
 def format_web_reference(author: str, consulted: str, title: str, medium: str, url: str) -> str:
-    """LaTeX text of the reference (without \\bibitem). `consulted` is an ISO date (YYYY-MM-DD)."""
-    author = _clean(author, "author")
-    title = _clean(title, "page title")
-    medium = _clean(medium or "En línia", "medium")
-    url = _clean(url, "URL").replace(" ", "")
-    try:
-        day = date.fromisoformat(consulted)
-    except (TypeError, ValueError) as exc:
-        raise UserError("The consultation date is not valid.") from exc
-    return (f"{escape_latex(author)} (Pàgina consultada {catalan_date(day)}). "
-            f"{escape_latex(title)}, [{escape_latex(medium)}]. Adreça URL: \\url{{{url}}}")
+    """LaTeX text of a web-page reference. `consulted` is an ISO date (YYYY-MM-DD)."""
+    return format_reference("web", {"author": author, "consulted": consulted, "title": title,
+                                    "medium": medium, "url": url})
 
 
-def suggest_key(author: str, consulted: str) -> str:
-    """'SIEMENS', 2000-02-11 -> 'siemens2000'; 'Equip Mediterrani' -> 'equipmediterrani2000'."""
-    ascii_author = unicodedata.normalize("NFKD", author or "").encode("ascii", "ignore").decode()
-    stem = re.sub(r"[^a-z0-9]", "", ascii_author.lower())[:24] or "web"
-    return stem + (consulted or "")[:4]
+def suggest_key(who: str, when: str) -> str:
+    """'SIEMENS', '2000-02-11' -> 'siemens2000'; 'Equip Mediterrani' -> 'equipmediterrani2000'."""
+    ascii_who = unicodedata.normalize("NFKD", who or "").encode("ascii", "ignore").decode()
+    stem = re.sub(r"[^a-z0-9]", "", ascii_who.lower())[:24] or "ref"
+    year = re.search(r"\d{4}", when or "")
+    return stem + (year.group(0) if year else "")
+
+
+def suggest_key_for(kind: str, fields: dict) -> str:
+    return suggest_key(*key_parts(kind, fields))
 
 
 def existing_keys(project: Project) -> set[str]:
@@ -134,9 +99,13 @@ def bibliography_setup(sources: dict) -> tuple[str, str | None]:
 def _add_to_bib(project: Project, bib: str, key: str, entry: str, mode: str) -> tuple[str, int]:
     """Append an @misc entry whose note is the formatted reference. Returns (bib rel, line)."""
     # The note is printed as-is by BibTeX styles (IEEEtran, plain…) and biblatex, which then add
-    # a final period; the house format has none after the URL. BibTeX skips its period when the
-    # text already ends in punctuation (an invisible \phantom{.}); biblatex has \nopunct.
-    ending = "\\nopunct" if mode == "biblatex" else "\\phantom{.}"
+    # a final period; the house format sometimes has none (after a URL or an ISBN). BibTeX skips
+    # its period when the text already ends in punctuation (an invisible \phantom{.} where it
+    # does not); biblatex has \nopunct.
+    if mode == "biblatex":
+        ending = "\\nopunct"
+    else:
+        ending = "" if entry.endswith((".", "?", "!")) else "\\phantom{.}"
     record = f"@misc{{{key},\n  note = {{{entry}{ending}}}\n}}\n"
     path = project.path(bib)
     if path.is_file():
@@ -152,7 +121,11 @@ def _add_to_bib(project: Project, bib: str, key: str, entry: str, mode: str) -> 
 
 
 def add_web_reference(project: Project, fields: dict) -> dict:
-    """Add the reference to the document's bibliography.
+    return add_reference(project, "web", fields)
+
+
+def add_reference(project: Project, kind: str, fields: dict) -> dict:
+    """Add a reference of type `kind` (see reftypes.types()) to the document's bibliography.
 
     With biblatex (\\addbibresource) or BibTeX (\\bibliography) it becomes an @misc entry
     in that .bib file; otherwise a \\bibitem in thebibliography. Returns
@@ -161,10 +134,8 @@ def add_web_reference(project: Project, fields: dict) -> dict:
     main = project.main_file
     if not main:
         raise UserError("Set the main file first (right-click a .tex file, \"Set as main file\").")
-    entry = format_web_reference(fields.get("author"), fields.get("consulted"), fields.get("title"),
-                                 fields.get("medium"), fields.get("url"))
-    key = unique_key(fields.get("key") or suggest_key(fields.get("author"), fields.get("consulted")),
-                     existing_keys(project))
+    entry = format_reference(kind, fields)
+    key = unique_key(fields.get("key") or suggest_key_for(kind, fields), existing_keys(project))
     sources = _tex_sources(project, main)
     mode, bib = bibliography_setup(sources)
     changed = []
@@ -197,7 +168,7 @@ def add_web_reference(project: Project, fields: dict) -> dict:
 
     # \url needs the url (or hyperref) package, loaded in any of the project's .tex files.
     url_package_added = False
-    if not any(URL_PACKAGE.search(text) for text, _ in sources.values()):
+    if "\\url{" in entry and not any(URL_PACKAGE.search(text) for text, _ in sources.values()):
         text, encoding = sources[main]
         dc = DOCUMENTCLASS_LINE.search(text)
         if dc:
