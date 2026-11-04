@@ -106,6 +106,69 @@ export function fitWidth() {
   if (pdfDoc) viewer.currentScaleValue = "page-width";
 }
 
+// ---------------------------------------------------------------------------
+// SyncTeX: points and boxes in PDF coordinates (points, top-left origin)
+// ---------------------------------------------------------------------------
+
+let inverseHandler = null;
+
+// fn(page, x, y) is called when the user double-clicks a spot in the PDF.
+export function onInverseSearch(fn) {
+  inverseHandler = fn;
+}
+
+container.addEventListener("dblclick", (e) => {
+  const pageDiv = e.target.closest(".page");
+  if (!pageDiv || !inverseHandler || !pdfDoc) return;
+  const pageNumber = Number(pageDiv.dataset.pageNumber);
+  const { viewport } = viewer.getPageView(pageNumber - 1);
+  const rect = pageDiv.getBoundingClientRect();
+  const [px, py] = viewport.convertToPdfPoint(e.clientX - rect.left - pageDiv.clientLeft, e.clientY - rect.top - pageDiv.clientTop);
+  const [x0, , , y1] = viewport.viewBox;
+  window.getSelection()?.removeAllRanges(); // the double-click also selected a word
+  inverseHandler(pageNumber, px - x0, y1 - py);
+});
+
+let flashTimer = null;
+
+// Scroll to and briefly highlight source boxes [{page, x, y, w, h}] from synctex.
+export function highlightBoxes(boxes) {
+  if (!pdfDoc || !boxes.length) return false;
+  for (const el of container.querySelectorAll(".synctex-flash")) el.remove();
+  clearTimeout(flashTimer);
+
+  const page = boxes[0].page;
+  const containerRect = container.getBoundingClientRect();
+  let firstTop = null;
+  for (const box of boxes.filter((b) => b.page === page)) {
+    const pageView = viewer.getPageView(page - 1);
+    if (!pageView) continue;
+    const { viewport, div } = pageView;
+    const [x0, , , y1] = viewport.viewBox;
+    // PDF.js 6 only converts points, so map two opposite corners.
+    const [ax, ay] = viewport.convertToViewportPoint(x0 + box.x, y1 - box.y - box.h);
+    const [bx, by] = viewport.convertToViewportPoint(x0 + box.x + box.w, y1 - box.y);
+    const pageRect = div.getBoundingClientRect();
+    const left = pageRect.left - containerRect.left + container.scrollLeft + div.clientLeft + Math.min(ax, bx);
+    const top = pageRect.top - containerRect.top + container.scrollTop + div.clientTop + Math.min(ay, by);
+    const flash = document.createElement("div");
+    flash.className = "synctex-flash";
+    Object.assign(flash.style, {
+      left: `${left - 2}px`,
+      top: `${top - 2}px`,
+      width: `${Math.max(Math.abs(bx - ax), 6) + 4}px`,
+      height: `${Math.max(Math.abs(by - ay), 6) + 4}px`,
+    });
+    container.append(flash);
+    firstTop ??= top;
+  }
+  if (firstTop !== null) container.scrollTo({ top: Math.max(0, firstTop - container.clientHeight / 3), behavior: "smooth" });
+  flashTimer = setTimeout(() => {
+    for (const el of container.querySelectorAll(".synctex-flash")) el.remove();
+  }, 2500);
+  return firstTop !== null;
+}
+
 $("btn-zoom-in").addEventListener("click", () => zoom(1));
 $("btn-zoom-out").addEventListener("click", () => zoom(-1));
 $("btn-fit-width").addEventListener("click", fitWidth);

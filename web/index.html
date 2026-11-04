@@ -95,6 +95,8 @@
             <dt><kbd>Ctrl</kbd>+<kbd>O</kbd></dt><dd>Import a .zip project</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>W</kbd></dt><dd>Close the current tab</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>Tab</kbd></dt><dd>Next tab</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>J</kbd></dt><dd>Show the cursor's line in the PDF</dd>
+            <dt>Double-click PDF</dt><dd>Jump to that place in the source</dd>
           </dl>
 
           <p class="engine-line" id="engine-line">Checking for LuaLaTeX…</p>
@@ -131,6 +133,10 @@
     <section class="pdf-pane" id="pdf-pane">
       <div class="pane-header pdf-toolbar">
         <span class="pane-title">PDF</span>
+        <button class="tb-btn small sync-btn" id="btn-sync" disabled title="Show the cursor's line in the PDF (Ctrl+Alt+J). Double-click the PDF to jump back to the source.">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+          <span>Find in PDF</span>
+        </button>
         <div class="spacer"></div>
         <span class="page-indicator" id="page-indicator">– / –</span>
         <button class="tb-btn icon-only small" id="btn-zoom-out" disabled title="Zoom out">

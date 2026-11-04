@@ -63,6 +63,27 @@ BUILD_PROBE = """
 }))()
 """
 
+# SyncTeX round trip: cursor on main.tex line 3 -> "Find in PDF" highlight -> double-click it -> back to line 3.
+SYNCTEX_PROBE = """
+window.__syncProbe = null;
+(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const ed = monaco.editor.getEditors()[0];
+  ed.setPosition({ lineNumber: 3, column: 2 });
+  document.getElementById("btn-sync").click();
+  let flash = null;
+  for (let i = 0; i < 100 && !(flash = document.querySelector(".synctex-flash")); i++) await sleep(50);
+  if (!flash) { window.__syncProbe = { flash: false }; return; }
+  await sleep(600); // smooth scroll
+  const r = flash.getBoundingClientRect();
+  ed.setPosition({ lineNumber: 1, column: 1 });
+  const x = r.left + Math.min(20, r.width / 2), y = r.top + r.height / 2;
+  document.elementFromPoint(x, y).dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: x, clientY: y }));
+  await sleep(1500);
+  window.__syncProbe = { flash: true, file: document.querySelector(".tab.active")?.title, line: ed.getPosition().lineNumber };
+})();
+"""
+
 # Async: stores its result in window.__editorProbe (evaluate_js does not await promises).
 EDITOR_PROBE = """
 window.__editorProbe = null;
@@ -114,6 +135,8 @@ def check(window, api, zip_path, results):
     time.sleep(0.5)
     results["build"] = wait_for(window, BUILD_PROBE,
                                 lambda v: not v["building"] and v["renderedPages"] and v["pdfText"], timeout=120)
+    window.evaluate_js(SYNCTEX_PROBE)
+    results["synctex"] = wait_for(window, "window.__syncProbe", lambda v: True, timeout=20)
     window.evaluate_js(EDITOR_PROBE)
     results["editor"] = wait_for(window, "window.__editorProbe", lambda v: True, timeout=15)
     time.sleep(0.5)
@@ -149,6 +172,7 @@ def main():
         "LaTeX highlighting": editor.get("language") == "latex"
             and {"keyword.section.latex", "math.latex", "comment.latex"} <= set(editor.get("tokens", [])),
         "\\ref autocomplete": editor.get("suggestions") == ["sec:intro"],
+        "SyncTeX source -> PDF -> source": results.get("synctex") == {"flash": True, "file": "main.tex", "line": 3},
     }
     for name, ok in checks.items():
         print(f"  {'PASS' if ok else 'FAIL'}  {name}")

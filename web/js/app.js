@@ -6,7 +6,7 @@ import * as editor from "./editor.js";
 import { FileTree } from "./filetree.js";
 import { initLayout, showPanel, toggleSidebar, togglePanel } from "./layout.js";
 import { setProjectData } from "./completion.js";
-import { clearPdf, showPdf } from "./pdfview.js";
+import { clearPdf, highlightBoxes, onInverseSearch, showPdf } from "./pdfview.js";
 import { counts as problemCounts, initProblems, setProblems } from "./problems.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
 
@@ -37,6 +37,7 @@ function setProjectUi(info) {
   name.disabled = !open;
   $("btn-export").disabled = !open;
   $("btn-compile").disabled = !open;
+  $("btn-sync").disabled = !open;
   for (const id of ["btn-new-file", "btn-new-folder", "btn-add-files"]) $(id).disabled = !open;
   $("welcome").hidden = open;
   editor.setProjectOpen(open);
@@ -317,6 +318,46 @@ async function compile() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// SyncTeX
+// ---------------------------------------------------------------------------
+
+// Source -> PDF: highlight where the cursor's line is typeset.
+async function forwardSearch() {
+  const pos = editor.cursor();
+  if (!project || !pos) return;
+  if (!pos.path.toLowerCase().endsWith(".tex")) {
+    setStatus("Open a .tex file to find its position in the PDF", "warning");
+    return;
+  }
+  if (editor.anyDirty()) setStatus("Unsaved changes: the PDF position is from the last compile", "warning");
+  try {
+    const boxes = await call("synctex_forward", pos.path, pos.line, pos.column);
+    if (!highlightBoxes(boxes)) setStatus(`Line ${pos.line} has no position in the PDF`, "warning");
+  } catch (err) {
+    showError(err);
+  }
+}
+
+// PDF -> source: open the file at the line that produced the double-clicked spot.
+async function inverseSearch(page, x, y) {
+  try {
+    const hit = await call("synctex_inverse", page, x, y);
+    if (!hit) {
+      setStatus("No source location for that spot in the PDF", "warning");
+      return;
+    }
+    await openFile(hit.file);
+    if (editor.getActivePath() === hit.file) {
+      editor.revealLine(hit.line);
+      editor.flashLine(hit.line);
+      setStatus(`${hit.file}:${hit.line}`);
+    }
+  } catch (err) {
+    showError(err);
+  }
+}
+
 async function onCompileButton() {
   if (building) {
     buildRequest++; // the running call will come back as cancelled
@@ -475,6 +516,8 @@ function initToolbar() {
   $("welcome-import").addEventListener("click", importZip);
   $("btn-save").addEventListener("click", saveAll);
   $("btn-compile").addEventListener("click", onCompileButton);
+  $("btn-sync").addEventListener("click", forwardSearch);
+  onInverseSearch(inverseSearch);
   $("btn-export").addEventListener("click", exportZip);
   $("btn-new-file").addEventListener("click", () => newItem(tree.find(tree.selected), "file"));
   $("btn-new-folder").addEventListener("click", () => newItem(tree.find(tree.selected), "folder"));
@@ -502,6 +545,12 @@ function initShortcuts() {
     if (document.querySelector("dialog[open]")) return;
     if (event.key === "F5") {
       event.preventDefault();
+      return;
+    }
+    if (event.ctrlKey && event.altKey && !event.shiftKey && event.code === "KeyJ") {
+      event.preventDefault();
+      event.stopPropagation();
+      forwardSearch();
       return;
     }
     if (!event.ctrlKey || event.altKey) return;

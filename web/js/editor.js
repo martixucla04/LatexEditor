@@ -316,6 +316,27 @@ export function focusEditor() {
   if (tabs.get(activePath)?.kind === "text") editor.focus();
 }
 
+// Cursor of the active text file: { path, line, column } or null.
+export function cursor() {
+  const tab = tabs.get(activePath);
+  if (tab?.kind !== "text") return null;
+  const pos = editor.getPosition();
+  return { path: tab.path, line: pos.lineNumber, column: pos.column };
+}
+
+let flashDecorations = null;
+
+// Briefly highlight a whole line of the active file (after a jump from the PDF).
+export function flashLine(line) {
+  flashDecorations?.clear();
+  flashDecorations = editor.createDecorationsCollection([{
+    range: new monaco.Range(line, 1, line, 1),
+    options: { isWholeLine: true, className: "line-flash" },
+  }]);
+  const current = flashDecorations;
+  setTimeout(() => current.clear(), 1600);
+}
+
 // Put the cursor on `line` of the active file (at the problem's squiggle when known).
 export function revealLine(line, problem = null) {
   const model = editor.getModel();

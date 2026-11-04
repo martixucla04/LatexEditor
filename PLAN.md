@@ -62,7 +62,7 @@ latexeditor/
     project.py       # per-project settings (.latexeditor.json), main-file detection
     builder.py       # LuaLaTeX build orchestrator
     logparser.py     # .log -> errors/warnings with file + line
-    synctex.py       # wrappers around `synctex view` / `synctex edit`
+    synctex.py       # wrappers around `synctex view` / `synctex edit` (forward / inverse search)
     completions.py   # labels, .bib entries, user macros, files for autocomplete
     search.py        # project-wide find/replace
     pdfserver.py     # localhost server for the output PDF
@@ -157,10 +157,12 @@ ignores the `max_print_line` env var and `--cnf-line`), so the log parser unwrap
 
 ### 4.5 SyncTeX
 
-- **Source → PDF** (Ctrl+click / Ctrl+Alt+J): `synctex view -i line:col:file -o .build/main.pdf`
-  → page + box → scroll PDF.js there and flash a highlight.
-- **PDF → Source** (double-click in PDF): convert click to PDF points →
-  `synctex edit -o page:x:y:.build/main.pdf` → open file, go to line.
+- **Source → PDF** (Ctrl+Alt+J or "Find in PDF"): `synctex view -i line:col:file -o .build/main.pdf`
+  (run from the project root) → boxes `h, v−H, W, H` in points from the page's top-left →
+  PDF.js `convertToViewportPoint` (v6 has no rectangle variant) → scroll there and flash.
+- **PDF → Source** (double-click in PDF): `convertToPdfPoint` → top-left points →
+  `synctex edit -o page:x:y:.build/main.pdf` → `Input:` is `<root>/./<relative path>` (UTF-8)
+  → open the file at the line and flash it.
 
 ### 4.6 Editor intelligence
 
@@ -200,7 +202,7 @@ Each phase ends with something runnable and is tested before moving on.
 | 3 | **Compile & PDF** ✅ | Build pipeline with LuaLaTeX + biber/BibTeX + glossaries/index (aux tools only when their inputs change); Ctrl+S saves and compiles, Compile/Stop button, progress in the status bar, raw log tab; PDF shown on the right, keeps zoom/scroll after recompile; zoom/fit controls, Ctrl+wheel |
 | 4 | **Error panel** ✅ | Parsed errors/warnings with filters and badge, squiggles in the editor (F8 = next problem), click-to-jump, raw log view, problems restored when a project is reopened |
 | 5 | **Editor intelligence** ✅ | LaTeX + BibTeX highlighting (math, refs, sections), autocomplete (commands, envs with snippets, `\end{` closes the open env, refs incl. unsaved labels, cites with author/year/title, files, packages, user macros), hover on `\ref`/`\cite`, folding, Ctrl+/ |
-| 6 | **SyncTeX** | Both directions working on multi-file projects |
+| 6 | **SyncTeX** ✅ | Ctrl+Alt+J / "Find in PDF" highlights the cursor's line in the PDF; double-click in the PDF opens the source line (with a flash); multi-file and accented paths |
 | 7 | **Find/replace in project** | Search panel with regex, replace-all with preview |
 | 8 | **Spell check** | English dictionary, suggestions, project dictionary |
 | 9 | **Polish & package** | Light/dark theme, settings dialog (font size, dictionary, workspace path), unsaved-changes prompts, `LatexEditor.exe` via PyInstaller |

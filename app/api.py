@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from . import __version__
+from . import __version__, synctex
 from .builder import Builder, BuildResult
 from .completions import scan_project
 from .errors import UserError
@@ -192,6 +192,24 @@ class Api:
         project = self._require_project()
         paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
         return project.add_files(parent_rel, list(paths)) if paths else []
+
+    def _synctex_pdf(self) -> tuple[Project, str]:
+        project = self._require_project()
+        pdf = project.pdf_path
+        if pdf is None or not pdf.with_suffix(".synctex.gz").is_file():
+            raise UserError("Compile the document first to jump between the source and the PDF.")
+        return project, pdf.relative_to(project.root).as_posix()
+
+    def synctex_forward(self, rel: str, line: int, column: int = 1):
+        """Where a source line ended up in the PDF: [{page, x, y, w, h}] in PDF points."""
+        project, pdf = self._synctex_pdf()
+        project.path(rel)  # validates the path
+        return synctex.forward(project.root, pdf, rel, int(line), int(column))
+
+    def synctex_inverse(self, page: int, x: float, y: float):
+        """Source location of a point in the PDF: {file, line} or None."""
+        project, pdf = self._synctex_pdf()
+        return synctex.inverse(project.root, pdf, int(page), float(x), float(y))
 
     def completion_data(self):
         """Labels, bibliography entries, user macros and files for autocomplete."""

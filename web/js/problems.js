@@ -103,6 +103,7 @@ function render() {
   emptyEl.hidden = items.length > 0;
   if (!built) emptyEl.textContent = "No problems. Compile the document to check it.";
   else if (!problems.length) emptyEl.textContent = "No problems in the last build.";
+  else if (!c.error && !c.warning) emptyEl.textContent = `No errors or warnings. ${c.info} typesetting note${c.info === 1 ? "" : "s"} hidden.`;
   else emptyEl.textContent = "All problems are hidden by the filters above.";
 }
 
