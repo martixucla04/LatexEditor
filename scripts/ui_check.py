@@ -165,6 +165,15 @@ def wait_for(window, script, ready, timeout=TIMEOUT_S):
 
 
 def check(window, api, zip_path, results):
+    try:
+        _check(window, api, zip_path, results)
+    except Exception as exc:  # record and still close the window, so the script never hangs
+        results["error"] = repr(exc)
+    finally:
+        window.destroy()
+
+
+def _check(window, api, zip_path, results):
     window.events.loaded.wait(TIMEOUT_S)
     results["layout"] = wait_for(window, LAYOUT_PROBE, lambda v: v["engineState"] != "engine-line")
 
@@ -173,7 +182,7 @@ def check(window, api, zip_path, results):
     api.import_zip(str(zip_path))
     window.evaluate_js("location.reload()")
     time.sleep(1)
-    wait_for(window, LAYOUT_PROBE, lambda v: v["recent"])
+    results["after_reload"] = wait_for(window, LAYOUT_PROBE, lambda v: v["recent"])
     window.evaluate_js('document.querySelector(".recent-item").click()')
     results["project"] = wait_for(window, PROJECT_PROBE, lambda v: v["tabs"] and v["editorLines"])
 
@@ -187,7 +196,6 @@ def check(window, api, zip_path, results):
     results["spell"] = wait_for(window, "window.__spellProbe", lambda v: True, timeout=30)
     window.evaluate_js(EDITOR_PROBE)
     results["editor"] = wait_for(window, "window.__editorProbe", lambda v: True, timeout=15)
-    window.destroy()
 
 
 def main():
@@ -201,7 +209,7 @@ def main():
             zf.writestr("check-paper/main.tex", DOC)
             zf.writestr("check-paper/sec/intro.tex", "Intro\\label{sec:intro}")
         api = Api(settings)
-        run(func=check, args=(api, zip_path, results), api=api)
+        run(func=check, args=(api, zip_path, results), api=api, private=True)
 
     print(json.dumps(results, indent=2, ensure_ascii=False))
     layout, project, build = results.get("layout", {}), results.get("project", {}), results.get("build", {})

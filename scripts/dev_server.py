@@ -32,6 +32,7 @@ class _Event:
 
 class _Events:
     closing = _Event()
+    loaded = _Event()
 
 
 class DevWindow:

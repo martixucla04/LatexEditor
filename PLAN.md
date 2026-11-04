@@ -85,10 +85,14 @@ latexeditor/
       synctex.js
       search.js      # sidebar Search view (project find/replace)
       spell.js       # spell-check markers, quick fixes, language picker
+      settings.js    # Settings dialog (theme, font size, wrap, projects folder)
       spell/worker.js  # typo.js dictionary + LaTeX-aware word extraction
     smoke.html       # dev-only page for scripts/smoke_test.py
     vendor/          # monaco, pdfjs, typo, dictionaries (fetched, not hand-edited)
+  latexeditor.py     # launcher used by PyInstaller
   scripts/
+    build_exe.py     # PyInstaller one-folder build + self-test of the .exe
+    make_icon.py     # draws the app icon (.ico) without an imaging library
     fetch_vendor.py
     smoke_test.py    # lualatex + pywebview + vendor libraries end-to-end check
     ui_check.py      # launches the real app window and drives the UI via JS
@@ -218,7 +222,7 @@ Each phase ends with something runnable and is tested before moving on.
 | 6 | **SyncTeX** ✅ | Ctrl+Alt+J / "Find in PDF" highlights the cursor's line in the PDF; double-click in the PDF opens the source line (with a flash); multi-file and accented paths |
 | 7 | **Find/replace in project** ✅ | Sidebar Search view (Ctrl+Shift+F): literal/regex, case, whole word, file patterns; results grouped by file, click selects the match; Replace all with confirmation, saves open files first, open tabs updated (undoable); Monaco Ctrl+F/Ctrl+H in the current file |
 | 8 | **Spell check** ✅ | English (US/UK), Català, Español in a Web Worker; language auto-detected from babel/polyglossia, switchable in the status bar; LaTeX-aware (skips commands, refs/cites, paths, math, comments, code); quick fixes with suggestions and "Add to project dictionary" |
-| 9 | **Polish & package** | Light/dark theme, settings dialog (font size, dictionary, workspace path), unsaved-changes prompts, `LatexEditor.exe` via PyInstaller |
+| 9 | **Polish & package** ✅ | Settings dialog (Ctrl+,): theme System/Light/Dark with live preview, editor font size, word wrap, projects folder; drag and drop a .zip to import (or files to add them); persistent WebView2 profile (UI state survives restarts, caches cleared at launch); app icon; `dist/LatexEditor/LatexEditor.exe` via PyInstaller with an end-to-end `--self-test` |
 
 ## 6. Testing
 
@@ -239,6 +243,8 @@ Each phase ends with something runnable and is tested before moving on.
 | MiKTeX missing-package popups stall builds | Detect stall, guide user to enable auto-install |
 | PDF flicker / losing position on reload | Render new PDF off-screen, swap, restore page + scroll offset |
 | Untrusted zips | Zip-slip checks, size limits, no shell-escape |
+| Stale UI files after an update (WebView2 keeps an HTTP/code cache in the persistent profile; pywebview's static server effectively sends only Last-Modified) | `Cache` and `Code Cache` are deleted at each launch; local storage is kept |
+| pywebview fills `window.pywebview.api` in after creating it | `bridge.js` calls the live object and waits briefly for a function to appear; no "backend missing" timeout inside WebView2 |
 | typo.js is slow on large dictionaries (Catalan loads in ~11 s, suggestions 1–3 s) | Web Worker, dictionary kept loaded for the session, status shows "loading", suggestions prefetched on cursor rest; possible later: cache the expanded dictionary in IndexedDB |
 
 ## 8. Possible later features

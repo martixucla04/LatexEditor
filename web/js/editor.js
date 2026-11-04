@@ -99,10 +99,21 @@ export async function initEditor(options) {
     suggest: { showWords: false, preview: true },
     quickSuggestions: { other: true, comments: false, strings: false },
     snippetSuggestions: "inline",
+    dropIntoEditor: { enabled: false }, // dropped files are imported/added, not pasted as text
   });
   editor.onDidChangeCursorPosition((e) => handlers.onCursor(e.position));
   updateView();
   return monaco;
+}
+
+export function setEditorOptions({ fontSize, wordWrap }) {
+  if (!editor) return;
+  editor.updateOptions({ fontSize, lineHeight: Math.round(fontSize * 1.5), wordWrap: wordWrap ? "on" : "off" });
+}
+
+// Re-read the page theme (after the Settings dialog changed it).
+export function refreshTheme() {
+  if (monaco) applyTheme();
 }
 
 export function setProjectOpen(open) {

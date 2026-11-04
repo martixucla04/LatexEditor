@@ -9,6 +9,10 @@ from .fsutil import appdata_dir, atomic_write_bytes, documents_dir
 APP_DIR_NAME = "LatexEditor"
 MAX_RECENT = 10
 
+THEMES = ("system", "light", "dark")
+FONT_SIZES = range(10, 25)
+DEFAULT_PREFERENCES = {"theme": "system", "font_size": 14, "word_wrap": True}
+
 
 def default_settings_path() -> Path:
     return appdata_dir() / APP_DIR_NAME / "settings.json"
@@ -17,7 +21,7 @@ def default_settings_path() -> Path:
 class Settings:
     def __init__(self, path: Path | None = None):
         self.path = path or default_settings_path()
-        self.data = {"workspace": str(documents_dir() / APP_DIR_NAME), "recent": []}
+        self.data = {"workspace": str(documents_dir() / APP_DIR_NAME), "recent": [], **DEFAULT_PREFERENCES}
         try:
             self.data.update(json.loads(self.path.read_text(encoding="utf-8")))
         except (OSError, ValueError):
@@ -32,6 +36,31 @@ class Settings:
         path = Path(self.data["workspace"])
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    # -- preferences (Settings dialog) -------------------------------------------
+
+    def preferences(self) -> dict:
+        return {
+            "theme": self.data["theme"] if self.data.get("theme") in THEMES else "system",
+            "font_size": self.data["font_size"] if self.data.get("font_size") in FONT_SIZES else 14,
+            "word_wrap": bool(self.data.get("word_wrap", True)),
+            "workspace": self.data["workspace"],
+        }
+
+    def update_preferences(self, changes: dict) -> dict:
+        """Apply known, valid keys from `changes`; returns the resulting preferences."""
+        if changes.get("theme") in THEMES:
+            self.data["theme"] = changes["theme"]
+        if changes.get("font_size") in FONT_SIZES:
+            self.data["font_size"] = int(changes["font_size"])
+        if isinstance(changes.get("word_wrap"), bool):
+            self.data["word_wrap"] = changes["word_wrap"]
+        if changes.get("workspace"):
+            path = Path(changes["workspace"])
+            path.mkdir(parents=True, exist_ok=True)  # raises if the location is not writable
+            self.data["workspace"] = str(path)
+        self.save()
+        return self.preferences()
 
     def recent(self) -> list[dict]:
         return [dict(item, exists=Path(item["path"]).is_dir()) for item in self.data["recent"]]

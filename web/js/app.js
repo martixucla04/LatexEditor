@@ -9,6 +9,7 @@ import { setProjectData } from "./completion.js";
 import { clearPdf, highlightBoxes, onInverseSearch, showPdf } from "./pdfview.js";
 import { counts as problemCounts, initProblems, setProblems } from "./problems.js";
 import { initSearch, setSearchProject, showSearch, showSidebarView } from "./search.js";
+import { loadPreferences, openSettings } from "./settings.js";
 import { setSpellProject } from "./spell.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
 
@@ -88,11 +89,12 @@ async function showProject(info) {
   }
 }
 
-async function importZip() {
+// path: a .zip already chosen (drag and drop); otherwise ask with the file dialog.
+async function importZip(path = null) {
   if (!(await confirmLeaveProject())) return;
-  setStatus("Choose a .zip file to import…");
+  setStatus(path ? "Importing…" : "Choose a .zip file to import…");
   try {
-    const info = await call("import_zip_dialog");
+    const info = await (path ? call("import_zip", path) : call("import_zip_dialog"));
     if (info) {
       await showProject(info);
       toast(`Imported "${info.name}"`, "success");
@@ -100,8 +102,58 @@ async function importZip() {
   } catch (err) {
     showError(err);
   } finally {
-    if ($("status-message").textContent.startsWith("Choose")) setStatus("Ready");
+    if (/^(Choose|Importing)/.test($("status-message").textContent)) setStatus("Ready");
   }
+}
+
+// Files dropped onto the window (full paths come from Python, see Api._on_drop).
+window.onFilesDropped = async (paths) => {
+  const zips = paths.filter((p) => p.toLowerCase().endsWith(".zip"));
+  if (zips.length === 1 && paths.length === 1) {
+    await importZip(zips[0]);
+    return;
+  }
+  if (!project) {
+    toast("Drop a single .zip file to import a project.", "warning");
+    return;
+  }
+  try {
+    const added = await call("add_files", targetFolder(tree.find(tree.selected)), paths.filter((p) => !zips.includes(p)));
+    if (added.length) {
+      await refreshProject();
+      tree.setActive(added[0]);
+      toast(added.length === 1 ? `Added ${added[0]}` : `Added ${added.length} files`, "success");
+    }
+  } catch (err) {
+    showError(err);
+  }
+};
+
+function initDropOverlay() {
+  const overlay = $("drop-overlay");
+  const hasFiles = (e) => e.dataTransfer?.types?.includes("Files");
+  let depth = 0;
+  window.addEventListener("dragenter", (e) => {
+    if (!hasFiles(e)) return;
+    depth++;
+    overlay.hidden = false;
+  });
+  window.addEventListener("dragover", (e) => {
+    if (hasFiles(e)) e.preventDefault(); // allow dropping
+  });
+  window.addEventListener("dragleave", () => {
+    if (--depth <= 0) {
+      depth = 0;
+      overlay.hidden = true;
+    }
+  });
+  window.addEventListener("drop", (e) => {
+    depth = 0;
+    overlay.hidden = true;
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    if (!window.pywebview) toast("Drag and drop works in the desktop app. Use Import .zip here.", "warning");
+  }, true);
 }
 
 async function openProject(path) {
@@ -518,11 +570,13 @@ const tree = new FileTree($("file-tree"), {
 // ---------------------------------------------------------------------------
 
 function initToolbar() {
-  $("btn-import").addEventListener("click", importZip);
-  $("welcome-import").addEventListener("click", importZip);
+  $("btn-import").addEventListener("click", () => importZip());
+  $("welcome-import").addEventListener("click", () => importZip());
+  initDropOverlay();
   $("btn-save").addEventListener("click", saveAll);
   $("btn-compile").addEventListener("click", onCompileButton);
   $("btn-sync").addEventListener("click", forwardSearch);
+  $("btn-settings").addEventListener("click", openSettings);
   onInverseSearch(inverseSearch);
   $("btn-export").addEventListener("click", exportZip);
   $("btn-new-file").addEventListener("click", () => newItem(tree.find(tree.selected), "file"));
@@ -541,10 +595,11 @@ function initShortcuts() {
   const ctrl = {
     b: toggleSidebar,
     j: togglePanel,
-    o: importZip,
+    o: () => importZip(),
     s: compile,
     w: () => editor.getActivePath() && editor.closeTab(editor.getActivePath()),
     r: () => {}, // no page reload: it would drop unsaved edits
+    ",": openSettings,
   };
   // Capture phase, so shortcuts work while Monaco has focus.
   window.addEventListener("keydown", (event) => {
@@ -642,6 +697,11 @@ async function main() {
     },
   });
   await Promise.all([showAppInfo(), renderRecent()]);
+  await loadPreferences({
+    onWorkspaceChange: (ws) => {
+      if (ws) $("workspace-line").textContent = `Projects are stored in ${ws}`;
+    },
+  }).catch((err) => console.warn("preferences", err));
 }
 
 main().catch(showError);

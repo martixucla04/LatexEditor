@@ -40,6 +40,25 @@ def test_import_opens_project_and_records_recent(settings, make_zip):
     assert api.remove_recent(info["root"]) == []
 
 
+def test_dropped_files_are_forwarded_to_the_page(settings):
+    class FakeWindow:
+        scripts = []
+
+        def evaluate_js(self, script):
+            self.scripts.append(script)
+
+    api = Api(settings)
+    api._window = FakeWindow()
+    api._on_drop({"dataTransfer": {"files": [
+        {"name": "paper.zip", "pywebviewFullPath": "C:\\Users\\me\\Tesi Martí\\paper.zip"},
+        {"name": "x.png"},  # no full path: ignored
+    ]}})
+    api._on_drop({"dataTransfer": {}})  # nothing dropped: no call
+    assert FakeWindow.scripts == [
+        'window.onFilesDropped && window.onFilesDropped(["C:\\\\Users\\\\me\\\\Tesi Mart\\u00ed\\\\paper.zip"])'
+    ]
+
+
 def test_closing_guard(settings, monkeypatch):
     import app.api as api_module
 

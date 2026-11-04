@@ -849,6 +849,76 @@ kbd {
 .choice span { display: flex; flex-direction: column; font-family: var(--font-mono); }
 .choice small { color: var(--text-muted); font-family: var(--font-ui); }
 
+/* Drag and drop files onto the window */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.drop-target {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(520px, 100%);
+  padding: 48px 24px;
+  border: 2px dashed var(--accent);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.drop-target strong { font-size: 16px; }
+.drop-target span { color: var(--text-muted); }
+
+/* Settings dialog */
+.modal.settings { width: min(520px, calc(100vw - 32px)); }
+
+.modal label.setting-row, .setting-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.setting-label { display: flex; flex-direction: column; }
+.setting-label small { color: var(--text-muted); font-size: 11.5px; }
+
+.setting-row select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.setting-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+.setting-workspace { flex-direction: column; align-items: stretch; }
+.setting-path-row { display: flex; align-items: center; gap: 8px; }
+
+.setting-path {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--surface-alt);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
 .context-menu {
   position: fixed;
   z-index: 100;

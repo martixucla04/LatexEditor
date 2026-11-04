@@ -1,15 +1,35 @@
 # LaTeX Editor
 
-Desktop LaTeX editor for LuaLaTeX projects: import a project `.zip`, edit on the left,
-see the PDF on the right. See [PLAN.md](PLAN.md) for the design and roadmap.
+Desktop LaTeX editor for LuaLaTeX research documents: import a project `.zip`, edit on the
+left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it was built.
+
+## Features
+
+- Import projects from `.zip` (button, Ctrl+O, or drag and drop onto the window); export back to `.zip`
+- File tree with new/rename/delete (Recycle Bin)/add files; tabs; Ctrl+S saves and compiles
+- LuaLaTeX builds with biber/BibTeX, glossaries and index run automatically when needed
+- PDF preview that keeps its zoom and position; SyncTeX (Ctrl+Alt+J ↔ double-click in the PDF)
+- Problems panel with clickable errors and squiggles in the editor
+- LaTeX/BibTeX highlighting; autocomplete for commands, environments, `\ref`, `\cite`, files
+- Project-wide search and replace (Ctrl+Shift+F)
+- Spell check: English (US/UK), Català, Español; language from babel/polyglossia
+- Settings (Ctrl+,): light/dark theme, font size, word wrap, projects folder
 
 ## Requirements
 
-- Windows with the WebView2 runtime (included in Windows 11)
-- Python 3.13
+- Windows 10/11 with the WebView2 runtime (included in Windows 11)
 - MiKTeX with `lualatex`, `biber`, `bibtex`, `makeindex`, `makeglossaries-lite`, `synctex`
+  on the PATH (Perl is **not** needed)
+- To run from source or build: Python 3.13
 
-## Setup
+## Use the packaged app
+
+Build it once (see below), then run `dist\LatexEditor\LatexEditor.exe`. The whole
+`dist\LatexEditor` folder is the app: copy it anywhere and keep the files together.
+Projects are stored in `Documents\LatexEditor` (changeable in Settings); app settings in
+`%APPDATA%\LatexEditor`.
+
+## Setup from source
 
 ```powershell
 python -m venv .venv
@@ -23,12 +43,22 @@ python -m venv .venv
 .\.venv\Scripts\python -m app            # add --debug for the WebView developer tools
 ```
 
+## Build the .exe
+
+```powershell
+.\.venv\Scripts\python scripts\build_exe.py
+```
+
+Creates `dist\LatexEditor\LatexEditor.exe` (~60 MB folder) and then runs it with
+`--self-test`: it must load the UI, import and compile a sample project, serve the PDF and
+spell-check, or the build reports FAIL.
+
 ## Tests
 
 ```powershell
-.\.venv\Scripts\python -m pytest         # unit tests + real LuaLaTeX builds (~40 s)
-.\.venv\Scripts\python -m pytest -m "not latex"   # skip the LuaLaTeX build tests
-.\.venv\Scripts\python scripts\ui_check.py   # opens the app window, checks layout + backend, closes it
+.\.venv\Scripts\python -m pytest                 # unit tests + real LuaLaTeX builds (~60 s)
+.\.venv\Scripts\python -m pytest -m "not latex"  # skip the LuaLaTeX build tests
+.\.venv\Scripts\python scripts\ui_check.py       # drives the real app window end to end
 ```
 
 To work on the UI in a normal browser with the real Python API behind it:
@@ -39,12 +69,3 @@ To work on the UI in a normal browser with the real Python API behind it:
 
 It uses a temporary workspace; native file dialogs are answered from a queue
 (`POST /dev/dialog {"result": [...]}`).
-
-## Check the setup
-
-```powershell
-.\.venv\Scripts\python scripts\smoke_test.py
-```
-
-Compiles a small document with LuaLaTeX and opens a window that loads Monaco, typo.js and
-PDF.js. It closes itself and prints `OK` results for all three (`--keep-open` to look at it).

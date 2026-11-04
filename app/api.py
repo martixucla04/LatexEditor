@@ -69,6 +69,19 @@ class Api:
         """Called by main.py once the window exists."""
         self._window = window
         window.events.closing += self._on_closing
+        window.events.loaded += self._on_loaded
+
+    def _on_loaded(self):
+        # Files dragged onto the window: only a Python-side drop handler gets their full paths.
+        from webview.dom import DOMEventHandler
+
+        self._window.dom.document.events.drop += DOMEventHandler(self._on_drop, prevent_default=True)
+
+    def _on_drop(self, event):
+        files = (event.get("dataTransfer") or {}).get("files") or []
+        paths = [f["pywebviewFullPath"] for f in files if f.get("pywebviewFullPath")]
+        if paths:
+            self._window.evaluate_js(f"window.onFilesDropped && window.onFilesDropped({json.dumps(paths)})")
 
     def _on_closing(self):
         if self._dirty and not ask_yes_no("LaTeX Editor", "You have unsaved changes. Quit without saving?"):
@@ -112,6 +125,24 @@ class Api:
             "engine": self._engine or None,
             "workspace": str(self._settings.workspace),
         }
+
+    def get_preferences(self):
+        """{theme, font_size, word_wrap, workspace}"""
+        return self._settings.preferences()
+
+    def set_preferences(self, changes: dict):
+        try:
+            return self._settings.update_preferences(changes or {})
+        except OSError as exc:
+            raise UserError(f"Could not use that folder: {exc}") from exc
+
+    def choose_workspace_dialog(self):
+        """Folder picker for where imported projects are stored; returns the preferences."""
+        current = self._settings.preferences()["workspace"]
+        paths = self._window.create_file_dialog(webview.FileDialog.FOLDER, directory=current)
+        if not paths:
+            return None
+        return self.set_preferences({"workspace": paths[0] if isinstance(paths, (list, tuple)) else paths})
 
     def set_dirty(self, dirty: bool):
         """The UI reports whether any open file has unsaved changes."""
@@ -187,6 +218,11 @@ class Api:
 
     def delete_path(self, rel: str):
         self._require_project().delete(rel)
+
+    def add_files(self, parent_rel: str, paths: list[str]):
+        """Copy files dropped onto the window into a project folder."""
+        files = [p for p in paths if Path(p).is_file()]
+        return self._require_project().add_files(parent_rel, files)
 
     def add_files_dialog(self, parent_rel: str = ""):
         project = self._require_project()
