@@ -20,6 +20,7 @@ NEWCOMMAND = re.compile(
     r"|\\def\s*(\\[A-Za-z@]+)"
 )
 NEWENVIRONMENT = re.compile(r"\\(?:new|renew)environment\*?\s*\{([A-Za-z*@]+)\}|\\NewDocumentEnvironment\s*\{([A-Za-z*@]+)\}")
+BIBITEM = re.compile(r"\\bibitem\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}")
 BIB_ENTRY = re.compile(r"@\s*([A-Za-z]+)\s*[{(]\s*([^,\s{}()]+)\s*,")
 BIB_SKIP_TYPES = {"string", "comment", "preamble"}
 BIB_FIELD = re.compile(r"([A-Za-z]+)\s*=\s*")
@@ -116,6 +117,11 @@ def scan_tex(text: str, file: str, data: dict) -> None:
             data["commands"].append({"name": name[1:], "args": args, "file": file, "line": number})
         for m in NEWENVIRONMENT.finditer(line):
             data["environments"].append({"name": m.group(1) or m.group(2), "file": file, "line": number})
+        # \bibitem{key} text: manual bibliography entries are citable too
+        for m in BIBITEM.finditer(line):
+            text = re.sub(r"\\url\{([^}]*)\}", r"\1", line[m.end():]).strip()
+            data["citations"].append({"key": m.group(1), "type": "bibitem", "title": text[:160], "author": "",
+                                      "year": "", "venue": "", "file": file, "line": number})
 
 
 def scan_project(root: Path) -> dict:

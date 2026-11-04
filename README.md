@@ -11,6 +11,9 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
 - File tree with new/rename/delete (Recycle Bin)/add files; tabs; Ctrl+S saves and compiles
 - Formatting toolbar: bold/italic/underline (Ctrl+B/I/U, toggle), emphasis, monospace,
   super/subscript, inline math (Ctrl+M), €, °C, °, ±, µ, lists from selected lines, section, comment
+- **Add web reference** ([1] button, Ctrl+Shift+R): fills in
+  `Autor (Pàgina consultada l’11 de febrer de 2000). Títol, [En línia]. Adreça URL: …` as a
+  `\bibitem` in the document's `thebibliography` (created if missing) and puts `~\cite{key}` at the cursor
 - LuaLaTeX builds with biber/BibTeX, glossaries and index run automatically when needed;
   unchanged projects are not rebuilt and a `.bib`-only change skips the first LaTeX run
 - PDF preview that keeps its zoom and position; SyncTeX (Ctrl+Alt+J ↔ double-click in the PDF)

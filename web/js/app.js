@@ -10,6 +10,7 @@ import { clearPdf, highlightBoxes, onInverseSearch, showPdf } from "./pdfview.js
 import { counts as problemCounts, initProblems, setProblems } from "./problems.js";
 import { initSearch, setSearchProject, showSearch, showSidebarView } from "./search.js";
 import { initFormatBar } from "./format.js";
+import { initReferences, openReferenceDialog } from "./references.js";
 import { loadPreferences, openSettings } from "./settings.js";
 import { setSpellProject } from "./spell.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
@@ -646,6 +647,12 @@ function initShortcuts() {
       event.preventDefault();
       return;
     }
+    if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyR") {
+      event.preventDefault(); // also stops the browser's hard reload
+      event.stopPropagation();
+      if (project) openReferenceDialog();
+      return;
+    }
     if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyO") {
       event.preventDefault();
       event.stopPropagation();
@@ -730,6 +737,13 @@ async function main() {
       for (const file of files.filter(editor.isOpen)) {
         editor.reloadFile(file, await call("read_file", file));
       }
+      refreshCompletionData();
+    },
+  });
+  initReferences({
+    saveAll,
+    afterChange: async (files) => {
+      for (const file of files.filter(editor.isOpen)) editor.reloadFile(file, await call("read_file", file));
       refreshCompletionData();
     },
   });

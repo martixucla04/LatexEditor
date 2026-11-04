@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from . import __version__, search, synctex
+from . import __version__, references, search, synctex
 from .builder import Builder, BuildResult
 from .completions import scan_project
 from .errors import UserError
@@ -259,6 +259,18 @@ class Api:
         return search.replace(self._require_project(), query, replacement, bool(o.get("regex")),
                               bool(o.get("case")), bool(o.get("word")),
                               o.get("include") or search.DEFAULT_INCLUDE, files)
+
+    def preview_web_reference(self, fields: dict):
+        """Formatted text and a free citation key for the Add reference dialog."""
+        project = self._require_project()
+        text = references.format_web_reference(fields.get("author"), fields.get("consulted"), fields.get("title"),
+                                               fields.get("medium"), fields.get("url"))
+        key = fields.get("key") or references.suggest_key(fields.get("author"), fields.get("consulted"))
+        return {"text": text, "key": references.unique_key(key, references.existing_keys(project))}
+
+    def add_web_reference(self, fields: dict):
+        """Add a web reference as a \\bibitem (see app/references.py)."""
+        return references.add_web_reference(self._require_project(), fields)
 
     def spell_settings(self):
         """{language: "en"|"ca"|"es"|"off", words: [project dictionary]}"""

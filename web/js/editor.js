@@ -455,6 +455,26 @@ export function makeList(env) {
   editor.focus();
 }
 
+// Insert \cite{key} at the cursor of the active .tex file; false if there is none.
+export function insertCitation(key) {
+  const tab = tabs.get(activePath);
+  if (tab?.kind !== "text" || tab.model.getLanguageId() !== "latex") return false;
+  const sel = editor.getSelection();
+  const before = sel.startColumn > 1
+    ? tab.model.getValueInRange(new monaco.Range(sel.startLineNumber, sel.startColumn - 1, sel.startLineNumber, sel.startColumn))
+    : "";
+  // "fabricant~\cite{…}": a non-breaking space keeps the number with the word.
+  const tie = before && !/[\s~(\[{]/.test(before) ? "~" : "";
+  editor.pushUndoStop();
+  editor.executeEdits("reference", [{ range: sel, text: `${tie}\\cite{${key}}`, forceMoveMarkers: true }]);
+  editor.pushUndoStop();
+  return true;
+}
+
+export function undoLastEdit() {
+  editor.trigger("reference", "undo", null);
+}
+
 export function runAction(id) {
   if (!textTabActive()) return;
   editor.focus();
@@ -487,14 +507,25 @@ export function selectRange(line, column, length) {
   editor.focus();
 }
 
-// Replace an open tab's content with what is now on disk (after a project-wide replace).
-// Done as an edit, so Ctrl+Z still undoes it in the editor.
+// Replace an open tab's content with what is now on disk (after a project-wide replace
+// or an added reference). Only the changed middle part is edited, so the cursor and
+// scroll position elsewhere stay put; done as an edit, so Ctrl+Z still undoes it.
 export function reloadFile(path, data) {
   const tab = tabs.get(path);
-  if (!tab?.model || data.kind !== "text" || tab.model.getValue() === data.text) return;
-  tab.model.pushStackElement(); // its own undo step, separate from earlier typing
-  tab.model.pushEditOperations([], [{ range: tab.model.getFullModelRange(), text: data.text }], () => null);
-  tab.model.pushStackElement();
+  if (!tab?.model || data.kind !== "text") return;
+  const model = tab.model;
+  const oldText = model.getValue();
+  const newText = data.text.replace(/\r\n/g, model.getEOL());
+  if (oldText === newText) return;
+  let prefix = 0;
+  const max = Math.min(oldText.length, newText.length);
+  while (prefix < max && oldText[prefix] === newText[prefix]) prefix++;
+  let suffix = 0;
+  while (suffix < max - prefix && oldText[oldText.length - 1 - suffix] === newText[newText.length - 1 - suffix]) suffix++;
+  const range = monaco.Range.fromPositions(model.getPositionAt(prefix), model.getPositionAt(oldText.length - suffix));
+  model.pushStackElement(); // its own undo step, separate from earlier typing
+  model.pushEditOperations([], [{ range, text: newText.slice(prefix, newText.length - suffix) }], () => null);
+  model.pushStackElement();
   tab.savedVersion = tab.model.getAlternativeVersionId();
   tab.encoding = data.encoding;
   renderTabs();

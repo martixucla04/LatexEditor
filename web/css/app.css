@@ -918,6 +918,45 @@ kbd {
 .drop-target strong { font-size: 16px; }
 .drop-target span { color: var(--text-muted); }
 
+/* Add web reference dialog */
+.modal.references { width: min(560px, calc(100vw - 32px)); }
+.modal label.ref-field {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.ref-field span { display: flex; flex-direction: column; }
+.ref-field small { color: var(--text-muted); font-size: 11px; }
+
+.ref-field input {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  color-scheme: inherit;
+}
+
+.ref-field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.ref-preview-box {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--surface-alt);
+}
+
+.ref-preview-box > small { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.modal .ref-preview { margin: 4px 0; color: var(--text); font-family: "Latin Modern Roman", Georgia, serif; overflow-wrap: anywhere; }
+.modal .ref-preview.empty { color: var(--text-muted); font-family: inherit; }
+.ref-preview-box > small.ref-key-note { color: var(--text-muted); font-family: var(--font-mono); font-size: 11.5px; text-transform: none; letter-spacing: 0; }
+
 /* Settings dialog */
 .modal.settings { width: min(520px, calc(100vw - 32px)); }
 

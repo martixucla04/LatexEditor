@@ -156,12 +156,28 @@ window.__editorProbe = null;
   const unbold = model.getLineContent(3);
   // Monaco's right-click menu must get the theme colours (it was unreadable in dark mode).
   const menuBg = getComputedStyle(document.getElementById("editor")).getPropertyValue("--vscode-menu-background").trim();
+  // Add web reference: \\cite at the cursor, \\bibitem in a new thebibliography.
+  ed.setPosition({ lineNumber: 3, column: 6 }); // after "Hello"
+  document.querySelector('.format-btn[data-action="reference"]').click();
+  await sleep(400);
+  const refInputs = document.querySelectorAll("dialog.references input");
+  const setRef = (i, v) => { refInputs[i].value = v; refInputs[i].dispatchEvent(new Event("input")); };
+  setRef(0, "SIEMENS"); setRef(1, "2000-02-11"); setRef(2, "SIEMENS. Productos y soluciones");
+  setRef(4, "http://www.siemens.es/html/prodsolu/prodserv.html");
+  await sleep(800);
+  document.querySelector("dialog.references .btn.primary").click();
+  await sleep(2500);
+  const refText = model.getValue();
+  const reference = {
+    cite: refText.split("\\n").find((l) => l.startsWith("Hello")) || "",  // line moved: \\usepackage{url} was added
+    bibitem: refText.includes("\\\\bibitem{siemens2000} SIEMENS (Pàgina consultada l’11 de febrer de 2000). SIEMENS. Productos y soluciones, [En línia]. Adreça URL: \\\\url{http://www.siemens.es/html/prodsolu/prodserv.html}"),
+  };
   // Recent projects menu in the toolbar lists the open project.
   document.getElementById("btn-recent").click();
   await sleep(500);
   const recentMenu = [...document.querySelectorAll(".context-menu .recent-menu-item span")].map((s) => s.textContent);
   document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  window.__editorProbe = { language: model.getLanguageId(), tokens, tokenizerError, searchSummary, suggestions, bold, unbold, menuBg, recentMenu };
+  window.__editorProbe = { language: model.getLanguageId(), tokens, tokenizerError, searchSummary, suggestions, bold, unbold, menuBg, recentMenu, reference };
 })();
 """
 
@@ -246,6 +262,8 @@ def main():
         "formatting toolbar": editor.get("bold", "").startswith("\\textbf{Hello}") and editor.get("unbold", "").startswith("Hello"),
         "editor menu has theme colours": bool(editor.get("menuBg")),
         "recent projects menu": editor.get("recentMenu") == ["check-paper"],
+        "add web reference": (editor.get("reference") or {}).get("bibitem") is True
+            and (editor.get("reference") or {}).get("cite", "").startswith("Hello~\\cite{siemens2000}"),
         "SyncTeX source -> PDF -> source": results.get("synctex") == {"flash": True, "file": "main.tex", "line": 3},
         "spell check marks prose typos only": (results.get("spell") or {}).get("markers")
             == ["“pargraph” is not in the English (US) dictionary"],

@@ -57,3 +57,11 @@ def test_scan_project(make_project):
     assert [e["name"] for e in data["environments"]] == ["proofsketch"]
     assert len(data["citations"]) == 3
     assert sorted(data["files"]) == ["ch/one.tex", "img/plot.png", "main.tex", "refs.bib"]
+
+
+def test_bibitems_are_citations(make_project):
+    root = make_project({"main.tex": "\\begin{thebibliography}{9}\n\\bibitem{siemens2000} SIEMENS (Pàgina consultada). "
+                                     "Adreça URL: \\url{http://x}\n\\end{thebibliography}\n"})
+    [c] = scan_project(root)["citations"]
+    assert (c["key"], c["type"], c["line"]) == ("siemens2000", "bibitem", 2)
+    assert c["title"].endswith("Adreça URL: http://x")

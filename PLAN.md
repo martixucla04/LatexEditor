@@ -263,6 +263,14 @@ Each phase ends with something runnable and is tested before moving on.
 - Side panel minimum width 200 px (its header needs ~194 px; at 160 px the upload button stuck
   out of the panel); the header clips instead of overflowing.
 - Toolbar **Recent** menu (Ctrl+Shift+O) and "Reopen the last project at startup" (default on).
+- **Add web reference** (`references.py`, `references.js`): house format
+  `Autor (Pàgina consultada <data>). Títol, [suport]. Adreça URL: \url{…}` with Catalan dates
+  (l’1/l’11, el 2…, d’abril/d’agost/d’octubre); added as `\bibitem` before
+  `\end{thebibliography}` (any project file) or in a new thebibliography before `\end{document}`;
+  `\usepackage{url}` added when neither url nor hyperref is loaded; refused for biblatex/BibTeX
+  documents; unique keys (siemens2000, siemens2000b…); `~\cite{key}` at the cursor; `\bibitem`
+  keys are offered by `\cite{` autocomplete. Open tabs are updated with a minimal edit, so the
+  cursor stays put.
 
 ## 9. Possible later features
 
