@@ -92,7 +92,84 @@ def test_reference_compiles(make_project):
     assert "Missing character" not in result.log
 
 
-def test_refuses_biblatex_documents(make_project):
-    root = make_project({"main.tex": DOC.replace("\\begin{document}", "\\usepackage{biblatex}\n\\begin{document}")})
+EXISTING_BIB = """@misc{FSGrules,
+  author       = {{Formula Student Germany}},
+  title        = {FSG Rules 2026 v1.1},
+  year         = {2025},
+  howpublished = {\\url{https://www.formulastudent.de/rules.pdf}},
+  note         = {Accessed: 12-Feb-2026}
+}
+@misc{siemens2000,
+  note = {older entry with the same key}
+}
+"""
+
+# Like a thesis template: BibTeX + IEEEtran, hyperref loaded from an \input style file.
+BIBTEX_PROJECT = {
+    "main.tex": "\\documentclass{report}\n\\input{estilo}\n\\usepackage[catalan]{babel}\n\\begin{document}\n"
+                "Text \\cite{FSGrules}.\n\\bibliographystyle{IEEEtran}\n\\bibliography{bibliografia}\n\\end{document}\n",
+    "estilo.tex": "\\usepackage{hyperref}\n",
+    "bibliografia.bib": EXISTING_BIB,
+}
+
+
+def test_bibtex_document_gets_a_bib_entry(make_project):
+    root = make_project(BIBTEX_PROJECT)
+    result = add_web_reference(Project(root), FIELDS)
+    assert (result["mode"], result["file"], result["key"], result["changed"], result["url_package_added"]) == (
+        "bibtex", "bibliografia.bib", "siemens2000b", ["bibliografia.bib"], False)
+    bib = (root / "bibliografia.bib").read_text(encoding="utf-8")
+    assert bib.startswith(EXISTING_BIB.rstrip("\n") + "\n\n@misc{siemens2000b,\n  note = {SIEMENS (Pàgina consultada")
+    assert bib.endswith("\\url{http://www.siemens.es/html/prodsolu/prodserv.html}\\phantom{.}}\n}\n")
+    assert bib.splitlines()[result["line"] - 1] == "@misc{siemens2000b,"
+    assert "thebibliography" not in (root / "main.tex").read_text(encoding="utf-8")
+
+
+def test_biblatex_document_gets_a_bib_entry(make_project):
+    root = make_project({
+        "main.tex": "\\documentclass{article}\n\\usepackage[backend=biber]{biblatex}\n\\addbibresource{refs/web.bib}\n"
+                    "\\begin{document}\nText.\n\\printbibliography\n\\end{document}\n",
+    })
+    result = add_web_reference(Project(root), FIELDS)
+    assert (result["mode"], result["file"], result["line"], result["url_package_added"]) == (
+        "biblatex", "refs/web.bib", 1, True)  # the .bib is created; \url needs the url package
+    assert (root / "refs" / "web.bib").read_text(encoding="utf-8").rstrip().endswith("prodserv.html}\\nopunct}\n}")
+
+
+def test_printbibliography_without_resource_is_refused(make_project):
+    root = make_project({"main.tex": DOC.replace("\\end{document}", "\\printbibliography\n\\end{document}")})
     with pytest.raises(UserError):
         add_web_reference(Project(root), FIELDS)
+
+
+@pytest.mark.latex
+@pytest.mark.skipif(__import__("shutil").which("lualatex") is None, reason="lualatex not installed")
+def test_bibtex_ieeetran_prints_the_house_format(make_project):
+    from app.builder import Builder
+
+    root = make_project(BIBTEX_PROJECT)
+    (root / "main.tex").write_text(BIBTEX_PROJECT["main.tex"].replace("\\cite{FSGrules}", "\\cite{FSGrules,siemens2000b}"),
+                                   encoding="utf-8")
+    add_web_reference(Project(root), FIELDS)
+    result = Builder(root, "main.tex").run()
+    assert result.status == "success", result.log[-2000:]
+    bbl = " ".join((root / ".build" / "main.bbl").read_text(encoding="utf-8").split())
+    # IEEEtran prints the note as-is, without adding a period after the URL
+    assert ("\\bibitem{siemens2000b} SIEMENS (Pàgina consultada l’11 de febrer de 2000). SIEMENS. Productos y "
+            "soluciones, [En línia]. Adreça URL: \\url{http://www.siemens.es/html/prodsolu/prodserv.html}\\phantom{.}") in bbl
+    assert "\\phantom{.}." not in bbl
+
+
+@pytest.mark.latex
+@pytest.mark.skipif(__import__("shutil").which("lualatex") is None, reason="lualatex not installed")
+def test_biblatex_reference_compiles(make_project):
+    from app.builder import Builder
+
+    root = make_project({
+        "main.tex": "\\documentclass{article}\n\\usepackage[catalan]{babel}\n\\usepackage[backend=biber]{biblatex}\n"
+                    "\\addbibresource{refs.bib}\n\\begin{document}\nText \\cite{siemens2000}.\n\\printbibliography\n\\end{document}\n",
+    })
+    add_web_reference(Project(root), FIELDS)
+    result = Builder(root, "main.tex").run()
+    assert result.status == "success", result.log[-2000:]
+    assert "Pàgina consultada l’11 de febrer de 2000" in (root / ".build" / "main.bbl").read_text(encoding="utf-8")

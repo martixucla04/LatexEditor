@@ -267,8 +267,11 @@ Each phase ends with something runnable and is tested before moving on.
   `Autor (Pàgina consultada <data>). Títol, [suport]. Adreça URL: \url{…}` with Catalan dates
   (l’1/l’11, el 2…, d’abril/d’agost/d’octubre); added as `\bibitem` before
   `\end{thebibliography}` (any project file) or in a new thebibliography before `\end{document}`;
-  `\usepackage{url}` added when neither url nor hyperref is loaded; refused for biblatex/BibTeX
-  documents; unique keys (siemens2000, siemens2000b…); `~\cite{key}` at the cursor; `\bibitem`
+  `\usepackage{url}` added when no project .tex file loads url or hyperref. BibTeX (`\bibliography`)
+  and biblatex (`\addbibresource`) documents get an `@misc{key, note = {<formatted text>}}` entry
+  in their .bib instead: styles such as IEEEtran print a note as-is, and the final period they
+  would add after the URL is suppressed (`\phantom{.}` for BibTeX, `\nopunct` for biblatex).
+  Unique keys (also against .bib keys) (siemens2000, siemens2000b…); `~\cite{key}` at the cursor; `\bibitem`
   keys are offered by `\cite{` autocomplete. Open tabs are updated with a minimal edit, so the
   cursor stays put.
 
