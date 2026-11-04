@@ -22,6 +22,7 @@ let projectOpen = false;
 let activePath = null;
 let modelCounter = 0;
 const tabs = new Map(); // path -> { path, kind, model, viewState, encoding, savedVersion, data }
+let problemsByPath = new Map(); // path -> build problems located in that file
 let handlers = { onDirtyChange() {}, onActiveChange() {}, onCursor() {} };
 let lastDirty = false;
 
@@ -115,6 +116,7 @@ export function openTab(path, data, { focus = true } = {}) {
       });
     }
     tabs.set(path, tab);
+    applyMarkers(tab);
   }
   activate(path, { focus });
 }
@@ -203,9 +205,66 @@ export function renamePaths(oldRel, newRel) {
     return [tab.path, tab];
   });
   tabs.clear();
-  for (const [path, tab] of entries) tabs.set(path, tab);
+  for (const [path, tab] of entries) {
+    tabs.set(path, tab);
+    applyMarkers(tab);
+  }
   renderTabs();
   handlers.onActiveChange(activePath);
+}
+
+// ---------------------------------------------------------------------------
+// Build problems as editor markers (squiggles; F8 jumps between them)
+// ---------------------------------------------------------------------------
+
+export function setProblems(problems) {
+  problemsByPath = new Map();
+  for (const p of problems || []) {
+    if (!p.file || !p.line) continue;
+    if (!problemsByPath.has(p.file)) problemsByPath.set(p.file, []);
+    problemsByPath.get(p.file).push(p);
+  }
+  for (const tab of tabs.values()) applyMarkers(tab);
+}
+
+const SEVERITY = () => ({
+  error: monaco.MarkerSeverity.Error,
+  warning: monaco.MarkerSeverity.Warning,
+  info: monaco.MarkerSeverity.Info,
+});
+
+// Where on the line to put the squiggle: TeX's context shows the source text up to
+// the error point, so underline the last token before it; otherwise the whole line.
+function markerRange(model, p) {
+  const line = Math.min(Math.max(1, p.line), model.getLineCount());
+  const text = model.getLineContent(line);
+  const before = (p.context || "").replace(/^\.\.\./, "");
+  const at = before ? text.indexOf(before) : -1;
+  if (at >= 0) {
+    const end = at + before.length;
+    const tokenStart = Math.max(before.lastIndexOf("\\"), before.search(/\S+$/));
+    return { line, start: at + Math.max(0, tokenStart) + 1, end: end + 1 };
+  }
+  const first = text.search(/\S/);
+  return { line, start: first >= 0 ? first + 1 : 1, end: text.length + 1 };
+}
+
+function applyMarkers(tab) {
+  if (!tab.model) return;
+  const severity = SEVERITY();
+  const markers = (problemsByPath.get(tab.path) || []).map((p) => {
+    const r = markerRange(tab.model, p);
+    return {
+      severity: severity[p.severity],
+      message: p.message,
+      source: p.source,
+      startLineNumber: r.line,
+      startColumn: r.start,
+      endLineNumber: r.line,
+      endColumn: Math.max(r.end, r.start + 1),
+    };
+  });
+  monaco.editor.setModelMarkers(tab.model, "latex-build", markers);
 }
 
 // Files with unsaved edits: [{ path, text, encoding, version }]
@@ -232,9 +291,14 @@ export function focusEditor() {
   if (tabs.get(activePath)?.kind === "text") editor.focus();
 }
 
-export function revealLine(line) {
-  editor.revealLineInCenter(line);
-  editor.setPosition({ lineNumber: line, column: 1 });
+// Put the cursor on `line` of the active file (at the problem's squiggle when known).
+export function revealLine(line, problem = null) {
+  const model = editor.getModel();
+  if (!model) return;
+  const target = Math.min(Math.max(1, line), model.getLineCount());
+  const column = problem ? markerRange(model, { ...problem, line: target }).start : 1;
+  editor.revealLineInCenter(target);
+  editor.setPosition({ lineNumber: target, column });
   editor.focus();
 }
 

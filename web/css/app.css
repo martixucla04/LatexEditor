@@ -479,6 +479,81 @@ kbd {
 }
 
 .panel-tab.active .badge { background: var(--border); }
+.badge.error, .panel-tab.active .badge.error { background: var(--danger); color: #fff; }
+.badge.warning, .panel-tab.active .badge.warning { background: var(--warning); color: #fff; }
+
+/* Problems list */
+.problem-filters {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] { background: var(--surface-alt); color: var(--text); }
+.chip[aria-pressed="false"] { opacity: 0.6; }
+.chip-count { font-weight: 600; }
+
+.sev-dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; }
+.sev-dot.error { background: var(--danger); }
+.sev-dot.warning { background: var(--warning); }
+.sev-dot.info { background: var(--text-muted); }
+
+.problem-list { margin: 0; padding: 0; list-style: none; user-select: text; }
+
+.problem {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.problem .sev-dot { transform: translateY(-1px); }
+.problem.navigable { cursor: pointer; }
+.problem.navigable:hover, .problem:focus-visible { background: var(--accent-soft); outline: none; }
+.problem-body { flex: 1; min-width: 0; }
+.problem-message { overflow-wrap: anywhere; }
+.problem.info .problem-message { color: var(--text-muted); }
+
+.problem-context {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.problem-location {
+  flex: 0 0 auto;
+  max-width: 40%;
+  color: var(--text-muted);
+  font: 11.5px var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.problem.navigable .problem-location { color: var(--accent); }
 .pane-body.log { font: 12px/1.5 var(--font-mono); user-select: text; }
 
 .log-text {

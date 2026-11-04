@@ -23,6 +23,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path, PurePosixPath
 
+from .logparser import collect_problems
 from .project import BUILD_DIR
 
 STATE_FILE = ".latexeditor-build.json"
@@ -65,6 +66,7 @@ class BuildResult:
     log: str = ""
     duration: float = 0.0
     steps: list[Step] = field(default_factory=list)
+    problems: list = field(default_factory=list)  # logparser.Problem
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -119,13 +121,6 @@ class Builder:
     def _out(self, ext: str) -> Path:
         return self.build_dir / f"{self.jobname}{ext}"
 
-    def _env(self) -> dict:
-        env = os.environ.copy()
-        env["max_print_line"] = "10000"  # unwrapped log lines (easier to parse)
-        env["error_line"] = "254"
-        env["half_error_line"] = "238"
-        return env
-
     def _run(self, tool: str, args: list[str], cwd: Path) -> Step:
         if self._cancelled.is_set():
             raise BuildCancelled()
@@ -133,7 +128,7 @@ class Builder:
         start = time.monotonic()
         with self._lock:
             self._proc = subprocess.Popen(
-                [tool, *args], cwd=cwd, env=self._env(),
+                [tool, *args], cwd=cwd,
                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 creationflags=CREATE_NO_WINDOW,
             )
@@ -290,13 +285,17 @@ class Builder:
 
         duration = round(time.monotonic() - start, 2)
         produced = pdf.exists() and pdf.stat().st_mtime >= started_at - 1
+        problems = collect_problems(self.root, self.build_dir, self.jobname, log, self.steps)
+        errors = sum(p.severity == "error" for p in problems)
         failed_tool = next((s for s in self.steps if s.tool != "lualatex" and s.exit_code not in (0, None)), None)
         if not produced:
             status, message = "failed", "Compilation failed: no PDF was produced"
-        elif step.exit_code != 0:
-            status, message = "errors", "Compiled with errors"
+        elif step.exit_code != 0 or errors:
+            noun = "error" if errors == 1 else "errors"
+            status, message = "errors", f"Compiled with {errors} {noun}" if errors else "Compiled with errors"
         elif failed_tool:
             status, message = "errors", f"Compiled, but {failed_tool.tool} reported errors"
         else:
             status, message = "success", f"Compiled in {duration:.1f} s"
-        return BuildResult(status, message, str(pdf) if produced else None, log, duration, self.steps)
+        return BuildResult(status, message, str(pdf) if produced else None, log, duration, self.steps,
+                           [p.to_dict() for p in problems])

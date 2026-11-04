@@ -146,7 +146,7 @@ def test_cancel(make_project):
 def test_api_compile_serves_pdf(settings, make_zip):
     api = Api(settings)
     api.import_zip(str(make_zip({"main.tex": PLAIN})))
-    assert api.current_pdf() is None
+    assert api.last_build()["pdf_url"] is None
     result = api.compile()
     assert result["status"] == "success"
     with urllib.request.urlopen(result["pdf_url"]) as resp:
@@ -156,4 +156,28 @@ def test_api_compile_serves_pdf(settings, make_zip):
     bad = result["pdf_url"].replace("/1.pdf", "").rsplit("/", 1)[0] + "/nope/1.pdf"
     with pytest.raises(urllib.error.HTTPError):
         urllib.request.urlopen(bad)
-    assert api.current_pdf().startswith("http://127.0.0.1:")
+    last = api.last_build()
+    assert last["pdf_url"].startswith("http://127.0.0.1:")
+    assert last["problems"] == [] and "LuaHBTeX" in last["log"]
+
+
+def test_problems_point_into_project_files(make_project):
+    root = make_project({
+        "main.tex": "\\documentclass{article}\n\\begin{document}\nSee \\ref{nope}.\n\\input{sec/body}\n\\end{document}\n",
+        "sec/body.tex": "Text (with a parenthesis.\n\\badmacro\n",
+    })
+    result = Builder(root, "main.tex").run()
+    assert result.status == "errors"
+    assert result.message == "Compiled with 1 error"
+    by_message = {p["message"]: p for p in result.problems}
+    error = by_message["Undefined control sequence."]
+    assert (error["file"], error["line"], error["context"]) == ("sec/body.tex", 2, "\\badmacro")
+    ref = next(p for p in result.problems if "Reference `nope'" in p["message"])
+    assert (ref["severity"], ref["file"], ref["line"]) == ("warning", "main.tex", 3)
+
+
+def test_bib_syntax_error_is_reported(make_project):
+    root = make_project({"main.tex": BIBLATEX, "refs.bib": BIB + "@book{broken author={X}}\n"})
+    result = Builder(root, "main.tex").run()
+    bib = [p for p in result.problems if p["source"] == "biber" and p["severity"] == "error"]
+    assert bib and bib[0]["file"] == "refs.bib" and bib[0]["line"] == 2

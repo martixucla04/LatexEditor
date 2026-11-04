@@ -79,7 +79,7 @@ latexeditor/
       latex-lang.js  # Monarch tokenizer for LaTeX/BibTeX
       completion.js  # commands, environments, \ref, \cite, paths
       pdfview.js     # PDF.js viewer, zoom, keep scroll on reload
-      errors.js      # error panel + Monaco markers
+      problems.js    # problems panel (markers live in editor.js)
       synctex.js
       search.js      # project find/replace panel
       spell/         # spell-check worker
@@ -114,7 +114,7 @@ latexeditor/
 Runs in a background thread; a new compile cancels a running one; whole build has a timeout.
 
 ```
-(cwd = project root, env max_print_line=10000 for unwrapped log lines)
+(cwd = project root)
 lualatex -interaction=nonstopmode -file-line-error -synctex=1
          -output-directory=.build -jobname=main main.tex
   if .build/main.bcf exists               -> biber .build/main             (biblatex)
@@ -125,9 +125,9 @@ lualatex -interaction=nonstopmode -file-line-error -synctex=1
   re-run lualatex after aux tools and while the log asks for a rerun (max 5 runs total)
 ```
 
-Verified on this machine: biber/bibtex find `.bib` files relative to the project root,
-non-ASCII project paths compile, and MiKTeX honours the `max_print_line` environment
-variable (it rejects the `--max-print-line` flag).
+Verified on this machine: biber/bibtex find `.bib` files relative to the project root and
+non-ASCII project paths compile. MiKTeX's LuaTeX always wraps log lines at 79 bytes (it
+ignores the `max_print_line` env var and `--cnf-line`), so the log parser unwraps them.
 
 - Auxiliary tools only run when their inputs changed (hash of `.bcf` + the `.bib` files it
   lists, `.aux` citations + `.bib` files, `.glo`/`.acn`, `.idx`), stored in
@@ -142,9 +142,14 @@ variable (it rejects the `--max-print-line` flag).
 
 ### 4.4 Error panel (`logparser.py`)
 
-- Parse `file:line: message` (file-line-error) plus the classic `! …` / `l.123` format.
-- Warnings: undefined references/citations, multiply defined labels, overfull/underfull boxes
-  (collapsible group), missing files, biber/BibTeX errors from `.blg`.
+- Join lines wrapped at 79 bytes, then follow `(file` / `)` to know the current file
+  (message bodies are skipped so their parentheses don't confuse the stack).
+- Parse `file:line: message` (file-line-error) plus the classic `! …` / `l.123` format;
+  the `l.N` context gives the exact token to underline.
+- Warnings: LaTeX/package/class warnings (with `(package)` continuation lines), missing
+  characters; overfull/underfull boxes and font substitutions as "Typesetting" notes
+  (hidden by default); biber/BibTeX errors from `.blg` (biber's temp-file line numbers are
+  mapped back to the `.bib` data source); tools that failed without a parsed error.
 - Each entry → row in the bottom panel + Monaco marker (squiggle) in the right file/line;
   clicking opens the file at that line. "Show raw log" toggle.
 
@@ -191,7 +196,7 @@ Each phase ends with something runnable and is tested before moving on.
 | 1 | **Window & layout** ✅ | App opens a window with file tree · editor · PDF, draggable splitters, toolbar, status bar; `ui_check.py` passes |
 | 2 | **Projects** ✅ | Import `.zip`, workspace folder, Recent Projects, file tree (open/new/rename/delete to Recycle Bin/add files), tabs, Ctrl+S save, Export `.zip`, main-file detection, unsaved-changes guard on quit |
 | 3 | **Compile & PDF** ✅ | Build pipeline with LuaLaTeX + biber/BibTeX + glossaries/index (aux tools only when their inputs change); Ctrl+S saves and compiles, Compile/Stop button, progress in the status bar, raw log tab; PDF shown on the right, keeps zoom/scroll after recompile; zoom/fit controls, Ctrl+wheel |
-| 4 | **Error panel** | Parsed errors/warnings, markers in editor, click-to-jump, raw log view |
+| 4 | **Error panel** ✅ | Parsed errors/warnings with filters and badge, squiggles in the editor (F8 = next problem), click-to-jump, raw log view, problems restored when a project is reopened |
 | 5 | **Editor intelligence** | LaTeX highlighting, autocomplete (commands, envs, refs, cites, paths), snippets |
 | 6 | **SyncTeX** | Both directions working on multi-file projects |
 | 7 | **Find/replace in project** | Search panel with regex, replace-all with preview |

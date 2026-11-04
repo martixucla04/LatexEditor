@@ -114,8 +114,10 @@
           </button>
           <button class="panel-tab" data-panel="log" role="tab" aria-selected="false">Log</button>
         </div>
-        <div class="pane-body" data-panel-body="problems">
-          <p class="empty-state">No problems. Compile the document to check it.</p>
+        <div class="pane-body problems" data-panel-body="problems">
+          <div class="problem-filters" id="problem-filters" hidden></div>
+          <ul class="problem-list" id="problem-list"></ul>
+          <p class="empty-state" id="problems-empty">No problems. Compile the document to check it.</p>
         </div>
         <div class="pane-body log" data-panel-body="log" hidden>
           <p class="empty-state" id="log-empty">The LuaLaTeX log appears here after compiling.</p>

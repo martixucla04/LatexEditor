@@ -20,6 +20,7 @@ from . import __version__
 from .builder import Builder, BuildResult
 from .errors import UserError
 from .fsutil import reveal_in_explorer
+from .logparser import collect_problems
 from .pdfserver import PdfServer
 from .project import Project
 from .settings import Settings
@@ -234,7 +235,20 @@ class Api:
         if builder is not None:
             builder.cancel()
 
-    def current_pdf(self):
-        """URL of the PDF from the last build of this project, if there is one."""
-        pdf = self._require_project().pdf_path
-        return self._pdfs().publish(pdf) if pdf and pdf.is_file() else None
+    def last_build(self):
+        """PDF URL, problems and log left by the previous build of this project (e.g. last session)."""
+        project = self._require_project()
+        pdf = project.pdf_path
+        if pdf is None:
+            return {"pdf_url": None, "problems": [], "log": ""}
+        log_path = pdf.with_suffix(".log")
+        try:
+            log = log_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            log = ""
+        problems = collect_problems(project.root, project.build_dir, pdf.stem, log)
+        return {
+            "pdf_url": self._pdfs().publish(pdf) if pdf.is_file() else None,
+            "problems": [p.to_dict() for p in problems],
+            "log": log,
+        }

@@ -58,6 +58,8 @@ BUILD_PROBE = """
   pages: document.getElementById("page-indicator").textContent,
   renderedPages: document.querySelectorAll("#pdf-pages .page[data-loaded]").length,
   pdfText: document.querySelector("#pdf-pages .textLayer")?.textContent || "",
+  problemBadge: document.getElementById("problem-count").textContent,
+  problemsEmpty: document.getElementById("problems-empty").textContent,
 }))()
 """
 
@@ -117,6 +119,7 @@ def main():
         "main file open in editor": project.get("tabs") == ["main.tex"] and project.get("editorLines", 0) >= 5,
         "compiles": build.get("status", "").startswith("Compiled in"),
         "PDF shown": build.get("pages") == "1 / 1" and "Hello" in build.get("pdfText", "") and "Intro" in build.get("pdfText", ""),
+        "no problems reported": build.get("problemBadge") == "0" and build.get("problemsEmpty") == "No problems in the last build.",
     }
     for name, ok in checks.items():
         print(f"  {'PASS' if ok else 'FAIL'}  {name}")

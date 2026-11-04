@@ -6,6 +6,7 @@ import * as editor from "./editor.js";
 import { FileTree } from "./filetree.js";
 import { initLayout, showPanel, toggleSidebar, togglePanel } from "./layout.js";
 import { clearPdf, showPdf } from "./pdfview.js";
+import { counts as problemCounts, initProblems, setProblems } from "./problems.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
@@ -56,6 +57,7 @@ async function showProject(info) {
   tree.expanded.clear();
   project = info;
   setProjectUi(info);
+  showBuildProblems(null);
   setBuildLog(null);
   clearPdf();
   tree.setTree(info.tree, info.main_file);
@@ -64,10 +66,14 @@ async function showProject(info) {
     await openFile(project.main_file);
   }
   setStatus("Ready");
-  // Show the PDF from the last session's build right away.
+  // Show the PDF, problems and log from the last session's build right away.
   try {
-    const url = await call("current_pdf");
-    if (url) await showPdf(url);
+    const last = await call("last_build");
+    if (last.log) {
+      setBuildLog(last.log);
+      showBuildProblems(last.problems);
+    }
+    if (last.pdf_url) await showPdf(last.pdf_url);
   } catch (err) {
     showError(err);
   }
@@ -107,6 +113,7 @@ async function closeProject() {
   tree.setTree([], null);
   setProjectUi(null);
   setBuilding(false);
+  showBuildProblems(null);
   setBuildLog(null);
   clearPdf();
   renderRecent();
@@ -239,6 +246,17 @@ function setBuildLog(text) {
   $("log-empty").hidden = !!text;
 }
 
+// null = nothing built yet
+function showBuildProblems(problems) {
+  setProblems(problems);
+  editor.setProblems(problems || []);
+}
+
+async function openProblem(problem) {
+  await openFile(problem.file);
+  if (editor.getActivePath() === problem.file && problem.line) editor.revealLine(problem.line, problem);
+}
+
 // Progress pushed from Python while a build runs (app/api.py _emit).
 window.onBuildEvent = (event) => {
   if (!building) return;
@@ -264,15 +282,19 @@ async function compile() {
       return;
     }
     setBuildLog(result.log);
+    showBuildProblems(result.problems);
+    const c = problemCounts();
     const kind = { success: "success", errors: "warning", failed: "error" }[result.status];
-    setStatus(result.message, kind);
+    const warnings = c.warning ? `, ${c.warning} warning${c.warning === 1 ? "" : "s"}` : "";
+    setStatus(result.message + warnings, kind);
+    if (c.error) showPanel("problems");
     if (result.pdf_url) {
       project.has_pdf = true;
       await showPdf(result.pdf_url);
     }
     if (result.status === "failed") {
-      showPanel("log");
-      toast(`${result.message}. See the Log tab for details.`, "error", 8000);
+      if (!c.error) showPanel("log");
+      toast(`${result.message}. See the ${c.error ? "Problems" : "Log"} tab for details.`, "error", 8000);
     }
   } catch (err) {
     if (request === buildRequest) {
@@ -520,6 +542,7 @@ async function showAppInfo() {
 
 async function main() {
   initLayout();
+  initProblems({ onOpen: openProblem });
   initToolbar();
   initShortcuts();
   setProjectUi(null);
