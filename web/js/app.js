@@ -5,6 +5,7 @@ import { call, BackendUnavailable } from "./bridge.js";
 import * as editor from "./editor.js";
 import { FileTree } from "./filetree.js";
 import { initLayout, showPanel, toggleSidebar, togglePanel } from "./layout.js";
+import { setProjectData } from "./completion.js";
 import { clearPdf, showPdf } from "./pdfview.js";
 import { counts as problemCounts, initProblems, setProblems } from "./problems.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
@@ -60,6 +61,8 @@ async function showProject(info) {
   showBuildProblems(null);
   setBuildLog(null);
   clearPdf();
+  setProjectData(null);
+  refreshCompletionData();
   tree.setTree(info.tree, info.main_file);
   if (!info.main_file) await chooseMainFile(info.main_candidates);
   if (project.main_file) {
@@ -122,6 +125,13 @@ async function closeProject() {
 async function refreshProject() {
   project = await call("project_info");
   tree.setTree(project.tree, project.main_file);
+  refreshCompletionData();
+}
+
+// Labels, .bib entries, macros and files for autocomplete (rescanned after saves and file changes).
+function refreshCompletionData() {
+  if (!project) return;
+  call("completion_data").then(setProjectData).catch((err) => console.warn("completion data", err));
 }
 
 async function chooseMainFile(candidates) {
@@ -217,6 +227,7 @@ async function saveAll() {
     }
   }
   setStatus(files.length === 1 ? `Saved ${basename(files[0].path)}` : `Saved ${files.length} files`);
+  refreshCompletionData();
   return true;
 }
 

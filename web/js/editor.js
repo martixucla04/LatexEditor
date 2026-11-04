@@ -2,10 +2,12 @@
 // view state (cursor/scroll) and saved version, so dirty state and position
 // survive tab switches. Images and binary files open in a read-only viewer.
 
+import { registerCompletions } from "./completion.js";
+import { registerLanguages, TOKEN_RULES } from "./latex-lang.js";
 import { confirmDialog } from "./ui.js";
 
 const LANGUAGE_BY_EXT = {
-  tex: "latex", sty: "latex", cls: "latex", ltx: "latex", dtx: "latex", ins: "latex", clo: "latex",
+  tex: "latex", sty: "latex", cls: "latex", ltx: "latex", dtx: "latex", ins: "latex", clo: "latex", bbx: "latex", cbx: "latex",
   bib: "bibtex", bst: "plaintext",
   md: "markdown", lua: "lua", json: "json", yaml: "yaml", yml: "yaml", xml: "xml", py: "python",
 };
@@ -46,12 +48,29 @@ function applyTheme() {
 export async function initEditor(options) {
   handlers = { ...handlers, ...options };
   monaco = await loadMonaco();
-  monaco.languages.register({ id: "latex", extensions: [".tex", ".sty", ".cls"], aliases: ["LaTeX"] });
-  monaco.languages.register({ id: "bibtex", extensions: [".bib"], aliases: ["BibTeX"] });
-  monaco.editor.defineTheme("latex-light", { base: "vs", inherit: true, rules: [], colors: {} });
+  registerLanguages(monaco);
+  registerCompletions(monaco, {
+    buffers: () => [...tabs.values()].filter((t) => t.model)
+      .map((t) => ({ path: t.path, text: isDirty(t) ? t.model.getValue() : "", dirty: isDirty(t) })),
+  });
+  // Nested braces get muted colours (Monaco's default gold would clash with math colouring).
+  monaco.editor.defineTheme("latex-light", {
+    base: "vs", inherit: true, rules: TOKEN_RULES.light,
+    colors: {
+      "editorBracketHighlight.foreground1": "#57606a",
+      "editorBracketHighlight.foreground2": "#6e7781",
+      "editorBracketHighlight.foreground3": "#8c959f",
+    },
+  });
   monaco.editor.defineTheme("latex-dark", {
-    base: "vs-dark", inherit: true, rules: [],
-    colors: { "editor.background": "#26272b", "editorGutter.background": "#26272b" },
+    base: "vs-dark", inherit: true, rules: TOKEN_RULES.dark,
+    colors: {
+      "editor.background": "#26272b",
+      "editorGutter.background": "#26272b",
+      "editorBracketHighlight.foreground1": "#8b949e",
+      "editorBracketHighlight.foreground2": "#a5adb6",
+      "editorBracketHighlight.foreground3": "#6e7681",
+    },
   });
   applyTheme();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
@@ -72,6 +91,12 @@ export async function initEditor(options) {
     // Accented letters (Catalan/Spanish) are normal text, not suspicious characters.
     unicodeHighlight: { ambiguousCharacters: false, invisibleCharacters: true },
     fixedOverflowWidgets: true,
+    // Suggestions only come from the LaTeX provider (commands, refs, cites…);
+    // word-based ones would pop up constantly while writing prose.
+    wordBasedSuggestions: "off",
+    suggest: { showWords: false, preview: true },
+    quickSuggestions: { other: true, comments: false, strings: false },
+    snippetSuggestions: "inline",
   });
   editor.onDidChangeCursorPosition((e) => handlers.onCursor(e.position));
   updateView();

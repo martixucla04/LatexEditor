@@ -63,6 +63,7 @@ latexeditor/
     builder.py       # LuaLaTeX build orchestrator
     logparser.py     # .log -> errors/warnings with file + line
     synctex.py       # wrappers around `synctex view` / `synctex edit`
+    completions.py   # labels, .bib entries, user macros, files for autocomplete
     search.py        # project-wide find/replace
     pdfserver.py     # localhost server for the output PDF
     settings.py      # app settings (theme, font size, dictionary, workspace path)
@@ -76,8 +77,9 @@ latexeditor/
       ui.js          # toasts, modal dialogs, context menus
       filetree.js
       editor.js      # Monaco setup, tabs, dirty state, save
-      latex-lang.js  # Monarch tokenizer for LaTeX/BibTeX
-      completion.js  # commands, environments, \ref, \cite, paths
+      latex-lang.js  # Monarch tokenizers + language config for LaTeX/BibTeX, token colours
+      latex-data.js  # built-in commands, environments, packages, classes
+      completion.js  # completion + hover providers (\ref, \cite, paths, \end{)
       pdfview.js     # PDF.js viewer, zoom, keep scroll on reload
       problems.js    # problems panel (markers live in editor.js)
       synctex.js
@@ -197,7 +199,7 @@ Each phase ends with something runnable and is tested before moving on.
 | 2 | **Projects** ✅ | Import `.zip`, workspace folder, Recent Projects, file tree (open/new/rename/delete to Recycle Bin/add files), tabs, Ctrl+S save, Export `.zip`, main-file detection, unsaved-changes guard on quit |
 | 3 | **Compile & PDF** ✅ | Build pipeline with LuaLaTeX + biber/BibTeX + glossaries/index (aux tools only when their inputs change); Ctrl+S saves and compiles, Compile/Stop button, progress in the status bar, raw log tab; PDF shown on the right, keeps zoom/scroll after recompile; zoom/fit controls, Ctrl+wheel |
 | 4 | **Error panel** ✅ | Parsed errors/warnings with filters and badge, squiggles in the editor (F8 = next problem), click-to-jump, raw log view, problems restored when a project is reopened |
-| 5 | **Editor intelligence** | LaTeX highlighting, autocomplete (commands, envs, refs, cites, paths), snippets |
+| 5 | **Editor intelligence** ✅ | LaTeX + BibTeX highlighting (math, refs, sections), autocomplete (commands, envs with snippets, `\end{` closes the open env, refs incl. unsaved labels, cites with author/year/title, files, packages, user macros), hover on `\ref`/`\cite`, folding, Ctrl+/ |
 | 6 | **SyncTeX** | Both directions working on multi-file projects |
 | 7 | **Find/replace in project** | Search panel with regex, replace-all with preview |
 | 8 | **Spell check** | English dictionary, suggestions, project dictionary |

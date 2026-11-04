@@ -18,6 +18,7 @@ import webview
 
 from . import __version__
 from .builder import Builder, BuildResult
+from .completions import scan_project
 from .errors import UserError
 from .fsutil import reveal_in_explorer
 from .logparser import collect_problems
@@ -191,6 +192,10 @@ class Api:
         project = self._require_project()
         paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
         return project.add_files(parent_rel, list(paths)) if paths else []
+
+    def completion_data(self):
+        """Labels, bibliography entries, user macros and files for autocomplete."""
+        return scan_project(self._require_project().root)
 
     def set_main_file(self, rel: str):
         project = self._require_project()

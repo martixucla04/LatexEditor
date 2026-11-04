@@ -63,6 +63,27 @@ BUILD_PROBE = """
 }))()
 """
 
+# Async: stores its result in window.__editorProbe (evaluate_js does not await promises).
+EDITOR_PROBE = """
+window.__editorProbe = null;
+(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const ed = monaco.editor.getEditors()[0];
+  const model = ed.getModel();
+  const tokens = monaco.editor.tokenize("\\\\section{A} $x^2$ % c", "latex")[0].map((t) => t.type);
+  // type "\\ref{" at the end and read the suggestion list
+  ed.focus();
+  ed.setPosition({ lineNumber: 3, column: model.getLineMaxColumn(3) });
+  for (const ch of " \\\\ref{") { ed.trigger("keyboard", "type", { text: ch }); await sleep(60); }
+  await sleep(1200);
+  const suggestions = [...document.querySelectorAll(".suggest-widget .monaco-list-row")]
+    .map((r) => r.getAttribute("aria-label").split(",")[0]);
+  ed.trigger("keyboard", "hideSuggestWidget", {});
+  ed.trigger("keyboard", "undo", {});
+  window.__editorProbe = { language: model.getLanguageId(), tokens, suggestions };
+})();
+"""
+
 DOC = "\\documentclass{article}\n\\begin{document}\nHello\n\\input{sec/intro}\n\\end{document}\n"
 
 
@@ -93,6 +114,10 @@ def check(window, api, zip_path, results):
     time.sleep(0.5)
     results["build"] = wait_for(window, BUILD_PROBE,
                                 lambda v: not v["building"] and v["renderedPages"] and v["pdfText"], timeout=120)
+    window.evaluate_js(EDITOR_PROBE)
+    results["editor"] = wait_for(window, "window.__editorProbe", lambda v: True, timeout=15)
+    time.sleep(0.5)
+    api.set_dirty(False)  # the probe typed into the editor; skip the unsaved-changes prompt
     window.destroy()
 
 
@@ -105,12 +130,13 @@ def main():
         zip_path = tmp / "check-paper.zip"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("check-paper/main.tex", DOC)
-            zf.writestr("check-paper/sec/intro.tex", "Intro")
+            zf.writestr("check-paper/sec/intro.tex", "Intro\\label{sec:intro}")
         api = Api(settings)
         run(func=check, args=(api, zip_path, results), api=api)
 
     print(json.dumps(results, indent=2, ensure_ascii=False))
     layout, project, build = results.get("layout", {}), results.get("project", {}), results.get("build", {})
+    editor = results.get("editor") or {}
     checks = {
         "engine detected": layout.get("engineState") == "engine-line ok",
         "layout sizes": layout.get("sidebar", 0) > 0 and layout.get("editor", 0) >= 320 and layout.get("pdf", 0) >= 280,
@@ -120,6 +146,9 @@ def main():
         "compiles": build.get("status", "").startswith("Compiled in"),
         "PDF shown": build.get("pages") == "1 / 1" and "Hello" in build.get("pdfText", "") and "Intro" in build.get("pdfText", ""),
         "no problems reported": build.get("problemBadge") == "0" and build.get("problemsEmpty") == "No problems in the last build.",
+        "LaTeX highlighting": editor.get("language") == "latex"
+            and {"keyword.section.latex", "math.latex", "comment.latex"} <= set(editor.get("tokens", [])),
+        "\\ref autocomplete": editor.get("suggestions") == ["sec:intro"],
     }
     for name, ok in checks.items():
         print(f"  {'PASS' if ok else 'FAIL'}  {name}")
