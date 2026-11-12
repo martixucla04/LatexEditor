@@ -214,3 +214,59 @@ def test_biblatex_reference_compiles(make_project):
     result = Builder(root, "main.tex").run()
     assert result.status == "success", result.log[-2000:]
     assert "Pàgina consultada l’11 de febrer de 2000" in (root / ".build" / "main.bbl").read_text(encoding="utf-8")
+
+
+def test_uncited_bibtex_reference_gets_nocite_above_bibliography(make_project):
+    root = make_project(BIBTEX_PROJECT)
+    result = add_web_reference(Project(root), {**FIELDS, "cite": False})
+    assert result["nocite_file"] == "main.tex"
+    assert result["changed"] == ["bibliografia.bib", "main.tex"]
+    # right above \bibliography (after \bibliographystyle)
+    assert "\\bibliographystyle{IEEEtran}\n\\nocite{siemens2000b}\n\\bibliography{bibliografia}\n" in \
+        (root / "main.tex").read_text(encoding="utf-8")
+
+
+def test_uncited_reference_in_included_file(make_project):
+    # \printbibliography in a chapter file: \nocite goes there, indented like it
+    root = make_project({
+        "main.tex": "\\documentclass{article}\n\\usepackage{biblatex}\n\\usepackage{url}\n\\addbibresource{r.bib}\n"
+                    "\\begin{document}\n\\input{back}\n\\end{document}\n",
+        "back.tex": "% \\printbibliography (commented)\n  \\printbibliography[title=Refs]\n",
+    })
+    result = add_web_reference(Project(root), {**FIELDS, "cite": False})
+    assert result["nocite_file"] == "back.tex"
+    assert (root / "back.tex").read_text(encoding="utf-8").endswith(
+        "(commented)\n  \\nocite{siemens2000}\n  \\printbibliography[title=Refs]\n")
+
+
+def test_uncited_reference_without_bibliography_line(make_project):
+    # no line prints the bibliography: before \end{document} of the main file
+    root = make_project({"main.tex": "\\documentclass{article}\n\\usepackage{biblatex}\n\\usepackage{url}\n"
+                                     "\\addbibresource{r.bib}\n\\begin{document}\nText.\n\\end{document}\n"})
+    add_web_reference(Project(root), {**FIELDS, "cite": False})
+    assert (root / "main.tex").read_text(encoding="utf-8").endswith("Text.\n\\nocite{siemens2000}\n\\end{document}\n")
+
+
+def test_uncited_bibitem_needs_no_nocite(make_project):
+    root = make_project({"main.tex": DOC})
+    result = add_web_reference(Project(root), {**FIELDS, "cite": False})
+    assert result["nocite_file"] is None
+    assert "\\nocite" not in (root / "main.tex").read_text(encoding="utf-8")
+
+
+@pytest.mark.latex
+@pytest.mark.skipif(__import__("shutil").which("lualatex") is None, reason="lualatex not installed")
+@pytest.mark.parametrize("setup", ["bibtex", "biblatex"])
+def test_uncited_reference_is_printed(make_project, setup):
+    from app.builder import Builder
+
+    files = BIBTEX_PROJECT if setup == "bibtex" else {
+        "main.tex": "\\documentclass{article}\n\\usepackage[catalan]{babel}\n\\usepackage[backend=biber]{biblatex}\n"
+                    "\\addbibresource{refs.bib}\n\\begin{document}\nText.\n\\printbibliography\n\\end{document}\n",
+    }
+    root = make_project(files)
+    key = add_web_reference(Project(root), {**FIELDS, "cite": False})["key"]
+    result = Builder(root, "main.tex").run()
+    assert result.status == "success", result.log[-2000:]
+    bbl = (root / ".build" / "main.bbl").read_text(encoding="utf-8")
+    assert key in bbl and "Pàgina consultada l’11 de febrer de 2000" in bbl

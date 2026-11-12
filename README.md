@@ -18,7 +18,9 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
 - **Add reference** ([1] button, Ctrl+Shift+R): choose what you cite (book, part of a book,
   standard, commercial catalogue, periodical, journal article, newspaper article, official
   publication, web page), fill in the form and it is written in the house style, e.g.
-  `KENNARD, L. “…”. Netware connection. Vol. 11 (2000), núm. 1, p. 6-20.`; `~\cite{key}` goes at the cursor. With BibTeX (`\bibliography{…}`, e.g. IEEEtran) or biblatex
+  `KENNARD, L. “…”. Netware connection. Vol. 11 (2000), núm. 1, p. 6-20.`; `~\cite{key}` goes at the cursor,
+  or untick "Cite it at the cursor" to only list it in the bibliography (`\nocite{key}` is added
+  above `\bibliography`/`\printbibliography` for `.bib` entries). With BibTeX (`\bibliography{…}`, e.g. IEEEtran) or biblatex
   (`\addbibresource{…}`) it becomes an `@misc` entry in that `.bib` file; otherwise a `\bibitem` in
   the document's `thebibliography` (created if missing)
 - LuaLaTeX builds with biber/BibTeX, glossaries and index run automatically when needed;

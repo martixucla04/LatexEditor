@@ -7,6 +7,9 @@ pages). Where it goes depends on how the document makes its bibliography:
   whose `note` is the formatted text, which every style prints as-is;
 - otherwise a \\bibitem before \\end{thebibliography} in the project file that has one,
   or in a new thebibliography before \\end{document} in the main file.
+A reference that is not cited in the text (fields["cite"] false) is still listed: a
+\\bibitem always is, and for a .bib entry \\nocite{key} is written just before the
+\\bibliography{…} / \\printbibliography line.
 URLs use \\url, so the url package is added to the preamble when no .tex file of the
 project loads url or hyperref.
 """
@@ -27,6 +30,8 @@ URL_PACKAGE = re.compile(r"^[^%\n]*\\usepackage(?:\[[^\]]*\])?\{[^}]*\b(url|xurl
 ADDBIBRESOURCE = re.compile(r"^[^%\n]*\\addbibresource(?:\[[^\]]*\])?\{([^}]+)\}", re.M)
 BIBLIOGRAPHY = re.compile(r"^[^%\n]*\\bibliography\{([^}]+)\}", re.M)
 PRINTBIBLIOGRAPHY = re.compile(r"^[^%\n]*\\printbibliography", re.M)
+# Start of the line that prints the bibliography, where \nocite goes.
+BIBLIOGRAPHY_LINE = re.compile(r"^[ \t]*(?=[^%\n]*\\(?:bibliography\{|printbibliography))", re.M)
 BIB_KEY = re.compile(r"@\s*[A-Za-z]+\s*[{(]\s*([^,\s{}()]+)\s*,")
 
 
@@ -129,7 +134,8 @@ def add_reference(project: Project, kind: str, fields: dict) -> dict:
 
     With biblatex (\\addbibresource) or BibTeX (\\bibliography) it becomes an @misc entry
     in that .bib file; otherwise a \\bibitem in thebibliography. Returns
-    {key, file, line, changed (files), url_package_added, mode}.
+    {key, file, line, changed (files), url_package_added, mode, nocite_file}.
+    With fields["cite"] false the reference is listed without a \\cite in the text.
     """
     main = project.main_file
     if not main:
@@ -140,9 +146,13 @@ def add_reference(project: Project, kind: str, fields: dict) -> dict:
     mode, bib = bibliography_setup(sources)
     changed = []
 
+    nocite_file = None
     if mode != "manual":
         target, line = _add_to_bib(project, bib, key, entry, mode)
         changed.append(target)
+        if fields.get("cite") is False:
+            nocite_file = _add_nocite(sources, main, key)
+            changed.append(nocite_file)
     else:
         if any(PRINTBIBLIOGRAPHY.search(text) for text, _ in sources.values()):
             raise UserError("This document prints a biblatex bibliography but no \\addbibresource{…} was found.")
@@ -184,4 +194,21 @@ def add_reference(project: Project, kind: str, fields: dict) -> dict:
         if rel in sources:
             project.write_file(rel, *sources[rel])
     return {"key": key, "file": target, "line": line, "changed": changed,
-            "url_package_added": url_package_added, "mode": mode}
+            "url_package_added": url_package_added, "mode": mode, "nocite_file": nocite_file}
+
+
+def _add_nocite(sources: dict, main: str, key: str) -> str:
+    """Write \\nocite{key} above the line that prints the bibliography (else before
+    \\end{document} of the main file), so an uncited .bib entry is still listed. Returns the file."""
+    for rel, (text, encoding) in sources.items():
+        m = BIBLIOGRAPHY_LINE.search(text)
+        if m:
+            break
+    else:
+        rel, (text, encoding) = main, sources[main]
+        m = END_DOCUMENT.search(text)
+        if not m:
+            raise UserError(f"No \\end{{document}} found in {main}.")
+    indent = re.match(r"[ \t]*", text[m.start():]).group(0)
+    sources[rel] = (text[:m.start()] + f"{indent}\\nocite{{{key}}}\n" + text[m.start():], encoding)
+    return rel

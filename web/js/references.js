@@ -10,6 +10,7 @@ import * as editor from "./editor.js";
 import { showError, toast } from "./ui.js";
 
 const LAST_TYPE_KEY = "latexeditor.referenceType";
+const CITE_KEY = "latexeditor.referenceCite";
 
 let handlers = { saveAll: async () => true, afterChange: async () => {} };
 
@@ -51,6 +52,22 @@ function rememberType(id) {
   }
 }
 
+function loadCite() {
+  try {
+    return localStorage.getItem(CITE_KEY) !== "no";
+  } catch {
+    return true;
+  }
+}
+
+function rememberCite(cite) {
+  try {
+    localStorage.setItem(CITE_KEY, cite ? "yes" : "no");
+  } catch {
+    // not remembered
+  }
+}
+
 export async function openReferenceDialog() {
   let types;
   try {
@@ -67,6 +84,9 @@ export async function openReferenceDialog() {
   const key = el("input", { type: "text", spellcheck: false, placeholder: "automatic" });
   const preview = el("p", { className: "ref-preview" });
   const keyNote = el("small", { className: "ref-key-note" });
+  // Unticked: the reference is only listed in the bibliography (BibTeX/biblatex get \nocite).
+  const cite = el("input", { type: "checkbox", checked: loadCite(), className: "ref-cite" });
+  cite.addEventListener("change", () => { rememberCite(cite.checked); updatePreview(); });
   let inputs = {}; // field id -> input
   let keyEdited = false;
   key.addEventListener("input", () => { keyEdited = true; updatePreview(); });
@@ -122,7 +142,10 @@ export async function openReferenceDialog() {
           (i ? [el("br"), line] : [line])));
         preview.classList.remove("empty");
         if (!keyEdited) key.value = result.key;
-        keyNote.textContent = `Cited as \\cite{${keyEdited ? key.value.trim() : result.key}}`;
+        const shownKey = keyEdited ? key.value.trim() : result.key;
+        keyNote.textContent = cite.checked
+          ? `Cited as \\cite{${shownKey}} at the cursor`
+          : `Listed in the bibliography only, not cited in the text (key ${shownKey})`;
       } catch (err) {
         preview.textContent = err.message;
         preview.classList.add("empty");
@@ -142,6 +165,10 @@ export async function openReferenceDialog() {
     el("label", { className: "ref-field ref-kind-row" }, [el("span", { textContent: "What are you citing?" }), kind]),
     fieldsBox,
     el("label", { className: "ref-field" }, [el("span", { textContent: "Citation key" }), key]),
+    el("label", { className: "ref-field checkbox" }, [
+      el("span", {}, ["Cite it at the cursor", el("small", { textContent: "Untick to only list it in the bibliography" })]),
+      cite,
+    ]),
     el("div", { className: "ref-preview-box" }, [el("small", { textContent: "Preview" }), preview, keyNote]),
     el("div", { className: "modal-actions" }, [cancel, add]),
   ]);
@@ -163,12 +190,13 @@ export async function openReferenceDialog() {
     try {
       const fields = values();
       const { key: citeKey } = await call("preview_reference", kind.value, fields);
+      const wantCite = cite.checked;
       // \cite first (so it is saved with the rest), then the entry on disk.
-      const cited = editor.insertCitation(citeKey);
+      const cited = wantCite && editor.insertCitation(citeKey);
       if (!(await handlers.saveAll())) throw new Error("Could not save the open files.");
       let result;
       try {
-        result = await call("add_reference", kind.value, { ...fields, key: citeKey });
+        result = await call("add_reference", kind.value, { ...fields, key: citeKey, cite: wantCite });
       } catch (err) {
         if (cited) editor.undoLastEdit();
         throw err;
@@ -177,7 +205,9 @@ export async function openReferenceDialog() {
       close();
       toast(`Reference added as [${result.key}] in ${result.file}`
         + (result.url_package_added ? " (and \\usepackage{url} in the preamble)" : "")
-        + (cited ? "" : ". Open a .tex file to insert \\cite automatically next time."), "success", 7000);
+        + (!wantCite
+          ? `, listed without citing it${result.nocite_file ? ` (\\nocite in ${result.nocite_file})` : ""}`
+          : cited ? "" : ". Open a .tex file to insert \\cite automatically next time."), "success", 7000);
     } catch (err) {
       showError(err);
       add.disabled = false;
