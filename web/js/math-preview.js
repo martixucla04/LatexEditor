@@ -57,7 +57,8 @@ function loadMathJax() {
   if (!mathJax) {
     mathJax = new Promise((resolve, reject) => {
       window.MathJax = {
-        tex: { tags: "none" },
+        // no \href/\class/\style: a formula in a project from someone else must not get a javascript: link
+        tex: { tags: "none", packages: { "[-]": ["html"] } },
         svg: { fontCache: "local" },
         options: { enableMenu: false },
         startup: {

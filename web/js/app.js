@@ -399,7 +399,7 @@ function setBuilding(on) {
   const button = $("btn-compile");
   button.classList.toggle("building", on);
   $("compile-label").textContent = on ? "Stop" : "Compile";
-  button.title = on ? "Stop compiling" : "Save and compile with LuaLaTeX (Ctrl+S)";
+  button.title = on ? "Stop compiling" : "Save and compile with LuaLaTeX (Ctrl+Shift+S)";
 }
 
 function setBuildLog(text) {
@@ -687,6 +687,23 @@ function initToolbar() {
   });
 }
 
+// Back in the window (after git pull, another editor…): tabs without unsaved edits
+// show the file as it is now on disk. Tabs with edits are left alone; saving them asks.
+async function reloadChangedTabs() {
+  const tabs = editor.cleanTextTabs();
+  if (!tabs.length) return;
+  try {
+    const times = await call("file_times", tabs.map((t) => t.path));
+    for (const tab of tabs) {
+      if (tab.mtime && times[tab.path] && times[tab.path] !== tab.mtime) {
+        editor.reloadFile(tab.path, await call("read_file", tab.path));
+      }
+    }
+  } catch {
+    // project closed meanwhile, or a file was deleted: nothing to reload
+  }
+}
+
 function initShortcuts() {
   const ctrl = {
     // Ctrl+B/I/U format text in the editor (format.js); the file panel is Ctrl+Shift+B.
@@ -698,6 +715,7 @@ function initShortcuts() {
     ",": openSettings,
   };
   // Capture phase, so shortcuts work while Monaco has focus.
+  window.addEventListener("focus", reloadChangedTabs);
   window.addEventListener("keydown", (event) => {
     if (document.querySelector("dialog[open]")) return;
     if (event.key === "F5") {

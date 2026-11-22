@@ -240,6 +240,11 @@ class Api:
         encoding = project.write_file(rel, text, encoding)
         return {"encoding": encoding, "mtime": project.mtime(rel)}
 
+    def file_times(self, paths: list):
+        """{path: mtime} for open tabs, so the page can reload files changed by other programs."""
+        project = self._require_project()
+        return {rel: project.mtime(rel) for rel in paths}
+
     def create_file(self, parent_rel: str, name: str):
         return self._require_project().create_file(parent_rel, name)
 

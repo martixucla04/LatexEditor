@@ -371,6 +371,11 @@ function applyMarkers(tab) {
 }
 
 // Files with unsaved edits: [{ path, text, encoding, version }]
+// Open text tabs without unsaved edits, with when they were read from disk.
+export function cleanTextTabs() {
+  return [...tabs.values()].filter((t) => t.kind === "text" && !isDirty(t)).map((t) => ({ path: t.path, mtime: t.mtime }));
+}
+
 export function dirtyFiles() {
   return [...tabs.values()].filter(isDirty).map((tab) => ({
     path: tab.path,

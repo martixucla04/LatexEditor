@@ -172,8 +172,17 @@ def to_latex(rows: list[list[str]], options: dict) -> str:
     return "\n".join(out + ["\\end{table}"]) + "\n"
 
 
-def _loaded(text: str, package: str) -> bool:
+def loads(text: str, package: str) -> bool:
+    """Whether `text` has an uncommented \\usepackage{…} that includes `package`."""
     return re.search(rf"^[^%\n]*\\usepackage(?:\[[^\]]*\])?\{{[^}}]*\b{package}\b", text, re.M) is not None
+
+
+def insert_packages(text: str, packages: list[str]) -> str | None:
+    """`text` with a \\usepackage line per package after \\documentclass; None if it has none."""
+    dc = DOCUMENTCLASS_LINE.search(text)
+    if not dc:
+        return None
+    return text[:dc.end()] + "".join(f"\n\\usepackage{{{p}}}" for p in packages) + text[dc.end():]
 
 
 def missing_packages(project: Project, packages: list[str], overrides: dict | None = None) -> list[str]:
@@ -183,7 +192,7 @@ def missing_packages(project: Project, packages: list[str], overrides: dict | No
         rel = project.rel(path)
         if rel.endswith(".tex") and rel not in texts:
             texts[rel] = project.read_file(rel).get("text", "")
-    return [p for p in packages if not any(_loaded(t, p) for t in texts.values())]
+    return [p for p in packages if not any(loads(t, p) for t in texts.values())]
 
 
 def add_packages(project: Project, packages: list[str]) -> dict:
@@ -193,10 +202,8 @@ def add_packages(project: Project, packages: list[str]) -> dict:
     if not missing or not main:
         return {"added": [], "file": main, "changed": []}
     data = project.read_file(main)
-    text = data["text"]
-    dc = DOCUMENTCLASS_LINE.search(text)
-    if not dc:
+    text = insert_packages(data["text"], missing)
+    if text is None:
         return {"added": [], "file": main, "changed": []}
-    text = text[:dc.end()] + "".join(f"\n\\usepackage{{{p}}}" for p in missing) + text[dc.end():]
     project.write_file(main, text, data.get("encoding", "utf-8"))
     return {"added": missing, "file": main, "changed": [main]}

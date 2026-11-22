@@ -4,9 +4,15 @@ import pytest
 
 from app.errors import UserError
 from app.project import Project
-from app.references import add_web_reference, catalan_date, format_web_reference, suggest_key
+from app.references import add_reference, suggest_key
+from app.reftypes import catalan_date, format_reference
 
 DOC = "\\documentclass{article}\n\\begin{document}\nText \\cite{x}.\n\\end{document}\n"
+
+
+def format_web_reference(author, consulted, title, medium, url):
+    return format_reference("web", {"author": author, "consulted": consulted, "title": title,
+                                    "medium": medium, "url": url})
 
 
 @pytest.mark.parametrize("d, expected", [
@@ -56,7 +62,7 @@ FIELDS = {"author": "SIEMENS", "consulted": "2000-02-11", "title": "SIEMENS. Pro
 
 def test_creates_bibliography_and_url_package(make_project):
     root = make_project({"main.tex": DOC})
-    result = add_web_reference(Project(root), FIELDS)
+    result = add_reference(Project(root), "web", FIELDS)
     text = (root / "main.tex").read_text(encoding="utf-8")
     assert result["key"] == "siemens2000" and result["url_package_added"]
     assert text.startswith("\\documentclass{article}\n\\usepackage{url}\n")
@@ -70,7 +76,7 @@ def test_appends_to_existing_bibliography_with_unique_keys(make_project):
         "main.tex": "\\documentclass{article}\n\\usepackage{hyperref}\n\\begin{document}\n\\input{refs}\n\\end{document}\n",
         "refs.tex": "\\begin{thebibliography}{9}\n  \\bibitem{siemens2000} Old.\n\\end{thebibliography}\n",
     })
-    result = add_web_reference(Project(root), FIELDS)
+    result = add_reference(Project(root), "web", FIELDS)
     assert (result["key"], result["file"], result["changed"], result["url_package_added"]) == (
         "siemens2000b", "refs.tex", ["refs.tex"], False)
     refs = (root / "refs.tex").read_text(encoding="utf-8")
@@ -84,7 +90,7 @@ def test_reference_compiles(make_project):
     from app.builder import Builder
 
     root = make_project({"main.tex": DOC.replace("\\cite{x}", "\\cite{siemens2000}")})
-    add_web_reference(Project(root), {**FIELDS, "url": "https://x.org/a_b?c=1&d=2#e%20f"})
+    add_reference(Project(root), "web", {**FIELDS, "url": "https://x.org/a_b?c=1&d=2#e%20f"})
     result = Builder(root, "main.tex").run()
     assert result.status == "success", result.log[-2000:]
     aux = (root / ".build" / "main.aux").read_text(encoding="utf-8")
@@ -115,7 +121,7 @@ BIBTEX_PROJECT = {
 
 def test_bibtex_document_gets_a_bib_entry(make_project):
     root = make_project(BIBTEX_PROJECT)
-    result = add_web_reference(Project(root), FIELDS)
+    result = add_reference(Project(root), "web", FIELDS)
     assert (result["mode"], result["file"], result["key"], result["changed"], result["url_package_added"]) == (
         "bibtex", "bibliografia.bib", "siemens2000b", ["bibliografia.bib"], False)
     bib = (root / "bibliografia.bib").read_text(encoding="utf-8")
@@ -130,7 +136,7 @@ def test_biblatex_document_gets_a_bib_entry(make_project):
         "main.tex": "\\documentclass{article}\n\\usepackage[backend=biber]{biblatex}\n\\addbibresource{refs/web.bib}\n"
                     "\\begin{document}\nText.\n\\printbibliography\n\\end{document}\n",
     })
-    result = add_web_reference(Project(root), FIELDS)
+    result = add_reference(Project(root), "web", FIELDS)
     assert (result["mode"], result["file"], result["line"], result["url_package_added"]) == (
         "biblatex", "refs/web.bib", 1, True)  # the .bib is created; \url needs the url package
     assert (root / "refs" / "web.bib").read_text(encoding="utf-8").rstrip().endswith("prodserv.html}\\nopunct}\n}")
@@ -139,7 +145,7 @@ def test_biblatex_document_gets_a_bib_entry(make_project):
 def test_printbibliography_without_resource_is_refused(make_project):
     root = make_project({"main.tex": DOC.replace("\\end{document}", "\\printbibliography\n\\end{document}")})
     with pytest.raises(UserError):
-        add_web_reference(Project(root), FIELDS)
+        add_reference(Project(root), "web", FIELDS)
 
 
 @pytest.mark.latex
@@ -150,7 +156,7 @@ def test_bibtex_ieeetran_prints_the_house_format(make_project):
     root = make_project(BIBTEX_PROJECT)
     (root / "main.tex").write_text(BIBTEX_PROJECT["main.tex"].replace("\\cite{FSGrules}", "\\cite{FSGrules,siemens2000b}"),
                                    encoding="utf-8")
-    add_web_reference(Project(root), FIELDS)
+    add_reference(Project(root), "web", FIELDS)
     result = Builder(root, "main.tex").run()
     assert result.status == "success", result.log[-2000:]
     bbl = " ".join((root / ".build" / "main.bbl").read_text(encoding="utf-8").split())
@@ -210,7 +216,7 @@ def test_biblatex_reference_compiles(make_project):
         "main.tex": "\\documentclass{article}\n\\usepackage[catalan]{babel}\n\\usepackage[backend=biber]{biblatex}\n"
                     "\\addbibresource{refs.bib}\n\\begin{document}\nText \\cite{siemens2000}.\n\\printbibliography\n\\end{document}\n",
     })
-    add_web_reference(Project(root), FIELDS)
+    add_reference(Project(root), "web", FIELDS)
     result = Builder(root, "main.tex").run()
     assert result.status == "success", result.log[-2000:]
     assert "Pàgina consultada l’11 de febrer de 2000" in (root / ".build" / "main.bbl").read_text(encoding="utf-8")
@@ -218,7 +224,7 @@ def test_biblatex_reference_compiles(make_project):
 
 def test_uncited_bibtex_reference_gets_nocite_above_bibliography(make_project):
     root = make_project(BIBTEX_PROJECT)
-    result = add_web_reference(Project(root), {**FIELDS, "cite": False})
+    result = add_reference(Project(root), "web", {**FIELDS, "cite": False})
     assert result["nocite_file"] == "main.tex"
     assert result["changed"] == ["bibliografia.bib", "main.tex"]
     # right above \bibliography (after \bibliographystyle)
@@ -233,7 +239,7 @@ def test_uncited_reference_in_included_file(make_project):
                     "\\begin{document}\n\\input{back}\n\\end{document}\n",
         "back.tex": "% \\printbibliography (commented)\n  \\printbibliography[title=Refs]\n",
     })
-    result = add_web_reference(Project(root), {**FIELDS, "cite": False})
+    result = add_reference(Project(root), "web", {**FIELDS, "cite": False})
     assert result["nocite_file"] == "back.tex"
     assert (root / "back.tex").read_text(encoding="utf-8").endswith(
         "(commented)\n  \\nocite{siemens2000}\n  \\printbibliography[title=Refs]\n")
@@ -243,13 +249,13 @@ def test_uncited_reference_without_bibliography_line(make_project):
     # no line prints the bibliography: before \end{document} of the main file
     root = make_project({"main.tex": "\\documentclass{article}\n\\usepackage{biblatex}\n\\usepackage{url}\n"
                                      "\\addbibresource{r.bib}\n\\begin{document}\nText.\n\\end{document}\n"})
-    add_web_reference(Project(root), {**FIELDS, "cite": False})
+    add_reference(Project(root), "web", {**FIELDS, "cite": False})
     assert (root / "main.tex").read_text(encoding="utf-8").endswith("Text.\n\\nocite{siemens2000}\n\\end{document}\n")
 
 
 def test_uncited_bibitem_needs_no_nocite(make_project):
     root = make_project({"main.tex": DOC})
-    result = add_web_reference(Project(root), {**FIELDS, "cite": False})
+    result = add_reference(Project(root), "web", {**FIELDS, "cite": False})
     assert result["nocite_file"] is None
     assert "\\nocite" not in (root / "main.tex").read_text(encoding="utf-8")
 
@@ -265,7 +271,7 @@ def test_uncited_reference_is_printed(make_project, setup):
                     "\\addbibresource{refs.bib}\n\\begin{document}\nText.\n\\printbibliography\n\\end{document}\n",
     }
     root = make_project(files)
-    key = add_web_reference(Project(root), {**FIELDS, "cite": False})["key"]
+    key = add_reference(Project(root), "web", {**FIELDS, "cite": False})["key"]
     result = Builder(root, "main.tex").run()
     assert result.status == "success", result.log[-2000:]
     bbl = (root / ".build" / "main.bbl").read_text(encoding="utf-8")

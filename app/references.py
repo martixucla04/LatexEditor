@@ -17,28 +17,21 @@ project loads url or hyperref.
 import re
 import unicodedata
 
+from . import tables
 from .errors import UserError
 from .project import Project
-from .reftypes import catalan_date, escape_latex, format_reference, key_parts  # noqa: F401 (re-exported)
+from .reftypes import format_reference, key_parts
 from .workspace import iter_project_files
 
 BIBITEM = re.compile(r"\\bibitem\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}")
 END_THEBIBLIOGRAPHY = re.compile(r"^[ \t]*\\end\{thebibliography\}", re.M)
 END_DOCUMENT = re.compile(r"^[ \t]*\\end\{document\}", re.M)
-DOCUMENTCLASS_LINE = re.compile(r"^[^%\n]*\\documentclass.*$", re.M)
-URL_PACKAGE = re.compile(r"^[^%\n]*\\usepackage(?:\[[^\]]*\])?\{[^}]*\b(url|xurl|hyperref)\b[^}]*\}", re.M)
 ADDBIBRESOURCE = re.compile(r"^[^%\n]*\\addbibresource(?:\[[^\]]*\])?\{([^}]+)\}", re.M)
 BIBLIOGRAPHY = re.compile(r"^[^%\n]*\\bibliography\{([^}]+)\}", re.M)
 PRINTBIBLIOGRAPHY = re.compile(r"^[^%\n]*\\printbibliography", re.M)
 # Start of the line that prints the bibliography, where \nocite goes.
 BIBLIOGRAPHY_LINE = re.compile(r"^[ \t]*(?=[^%\n]*\\(?:bibliography\{|printbibliography))", re.M)
 BIB_KEY = re.compile(r"@\s*[A-Za-z]+\s*[{(]\s*([^,\s{}()]+)\s*,")
-
-
-def format_web_reference(author: str, consulted: str, title: str, medium: str, url: str) -> str:
-    """LaTeX text of a web-page reference. `consulted` is an ISO date (YYYY-MM-DD)."""
-    return format_reference("web", {"author": author, "consulted": consulted, "title": title,
-                                    "medium": medium, "url": url})
 
 
 def suggest_key(who: str, when: str) -> str:
@@ -125,10 +118,6 @@ def _add_to_bib(project: Project, bib: str, key: str, entry: str, mode: str) -> 
     return project.rel(path), head.count("\n") + (3 if head else 1)
 
 
-def add_web_reference(project: Project, fields: dict) -> dict:
-    return add_reference(project, "web", fields)
-
-
 def add_reference(project: Project, kind: str, fields: dict) -> dict:
     """Add a reference of type `kind` (see reftypes.types()) to the document's bibliography.
 
@@ -178,11 +167,11 @@ def add_reference(project: Project, kind: str, fields: dict) -> dict:
 
     # \url needs the url (or hyperref) package, loaded in any of the project's .tex files.
     url_package_added = False
-    if "\\url{" in entry and not any(URL_PACKAGE.search(text) for text, _ in sources.values()):
+    if "\\url{" in entry and not any(tables.loads(text, p) for text, _ in sources.values()
+                                     for p in ("url", "xurl", "hyperref")):
         text, encoding = sources[main]
-        dc = DOCUMENTCLASS_LINE.search(text)
-        if dc:
-            text = text[:dc.end()] + "\n\\usepackage{url}" + text[dc.end():]
+        text = tables.insert_packages(text, ["url"])
+        if text is not None:
             sources[main] = (text, encoding)
             url_package_added = True
             if target == main:
