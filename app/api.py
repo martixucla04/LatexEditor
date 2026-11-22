@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from . import __version__, references, reftypes, search, synctex
+from . import __version__, outline, references, reftypes, search, synctex
 from .builder import Builder, BuildResult
 from .completions import scan_project
 from .errors import UserError
@@ -310,6 +310,10 @@ class Api:
 
     def add_spell_word(self, word: str):
         return self._require_project().add_spell_word(word)
+
+    def outline(self, overrides: dict | None = None):
+        """Headings of the whole document in reading order; `overrides` = unsaved buffers {path: text}."""
+        return outline.outline(self._require_project(), overrides)
 
     def completion_data(self):
         """Labels, bibliography entries, user macros and files for autocomplete."""

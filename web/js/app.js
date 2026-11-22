@@ -9,6 +9,7 @@ import { setProjectData } from "./completion.js";
 import { clearPdf, highlightBoxes, onInverseSearch, showPdf } from "./pdfview.js";
 import { counts as problemCounts, initProblems, setProblems } from "./problems.js";
 import { initSearch, setSearchProject, showSearch, showSidebarView } from "./search.js";
+import { clearOutline, initOutline, refreshOutline, setOutlineCursor } from "./outline.js";
 import { initFormatBar } from "./format.js";
 import { initReferences, openReferenceDialog } from "./references.js";
 import { loadPreferences, openSettings } from "./settings.js";
@@ -47,6 +48,7 @@ function setProjectUi(info) {
   $("welcome").hidden = open;
   editor.setProjectOpen(open);
   setSearchProject(open);
+  if (!open) clearOutline();
   if (!open) showSidebarView("files");
   document.title = open ? `${info.name} - LaTeX Editor` : "LaTeX Editor";
 }
@@ -218,6 +220,7 @@ async function refreshProject() {
 // Labels, .bib entries, macros and files for autocomplete (rescanned after saves and file changes).
 function refreshCompletionData() {
   if (!project) return;
+  refreshOutline();
   call("completion_data").then(setProjectData).catch((err) => console.warn("completion data", err));
 }
 
@@ -238,6 +241,7 @@ async function setMainFile(path) {
   try {
     project = await call("set_main_file", path);
     tree.setTree(project.tree, project.main_file);
+    refreshOutline();
     toast(`Main file: ${path}`, "success");
   } catch (err) {
     showError(err);
@@ -664,7 +668,7 @@ function initShortcuts() {
     // Ctrl+B/I/U format text in the editor (format.js); the file panel is Ctrl+Shift+B.
     j: togglePanel,
     o: () => importZip(),
-    s: compile,
+    s: saveAll, // Ctrl+Shift+S saves and compiles
     w: () => editor.getActivePath() && editor.closeTab(editor.getActivePath()),
     r: () => {}, // no page reload: it would drop unsaved edits
     ",": openSettings,
@@ -680,6 +684,12 @@ function initShortcuts() {
       event.preventDefault(); // also stops the browser's hard reload
       event.stopPropagation();
       if (project) openReferenceDialog();
+      return;
+    }
+    if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyS") {
+      event.preventDefault();
+      event.stopPropagation();
+      compile();
       return;
     }
     if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyO") {
@@ -777,6 +787,13 @@ async function main() {
       refreshCompletionData();
     },
   });
+  initOutline({
+    buffers: () => editor.dirtyFiles().filter((f) => f.path.endsWith(".tex")),
+    onOpen: async (file, line) => {
+      await openFile(file);
+      if (editor.getActivePath() === file) editor.revealLine(line);
+    },
+  });
   initReferences({
     saveAll,
     afterChange: async (files) => {
@@ -795,6 +812,10 @@ async function main() {
     onActiveChange: (path) => tree.setActive(path),
     onCursor: (pos) => {
       $("status-cursor").textContent = pos ? `Ln ${pos.lineNumber}, Col ${pos.column}` : "";
+      setOutlineCursor(editor.getActivePath(), pos?.lineNumber ?? 0);
+    },
+    onEdit: (path) => {
+      if (path.endsWith(".tex")) refreshOutline(800);
     },
   });
   initFormatBar();

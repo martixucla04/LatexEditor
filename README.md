@@ -12,7 +12,7 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
   the Recent lists
 - **Recent** menu in the toolbar (Ctrl+Shift+O) to switch projects; the last project reopens at
   startup (can be turned off in Settings)
-- File tree with new/rename/delete (Recycle Bin)/add files; tabs; Ctrl+S saves and compiles
+- File tree with new/rename/delete (Recycle Bin)/add files; tabs; Ctrl+S saves, Ctrl+Shift+S saves and compiles
 - Formatting toolbar: bold/italic/underline (Ctrl+B/I/U, toggle), emphasis, monospace,
   super/subscript, inline math (Ctrl+M), €, °C, °, ±, µ, lists from selected lines, section, comment
 - **Add reference** ([1] button, Ctrl+Shift+R): choose what you cite (book, part of a book,
@@ -27,6 +27,12 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
   unchanged projects are not rebuilt and a `.bib`-only change skips the first LaTeX run
 - PDF preview that keeps its zoom and position; SyncTeX (Ctrl+Alt+J ↔ double-click in the PDF)
 - Problems panel with clickable errors and squiggles in the editor
+- **Outline** tab in the side panel: parts, chapters, sections and subsections in reading order
+  (following `\input`/`\include` from the main file, unsaved edits included); click one to jump
+  there, the one the cursor is in is highlighted
+- **Equation preview**: with the cursor inside `$…$`, `\(…\)`, `\[…\]`, `$$…$$` or an
+  `equation`/`align`/`gather`/`multline`… environment, the rendered math (MathJax) shows below it,
+  or the error if it does not parse. Macros defined in the preamble are not known to the preview
 - LaTeX/BibTeX highlighting; autocomplete for commands, environments, `\ref`, `\cite`, files.
   The project's images pop up as soon as the cursor is in an empty `\includegraphics{}` (e.g. from
   the `figure` snippet); type part of the file name (`em01`) to find one in any subfolder

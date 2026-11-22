@@ -42,7 +42,7 @@
 
     <div class="spacer"></div>
 
-    <button class="tb-btn primary" id="btn-compile" disabled title="Save and compile with LuaLaTeX (Ctrl+S)">
+    <button class="tb-btn primary" id="btn-compile" disabled title="Save and compile with LuaLaTeX (Ctrl+Shift+S)">
       <svg viewBox="0 0 24 24" class="filled icon-play"><path d="M7 4.5v15l12-7.5z"/></svg>
       <svg viewBox="0 0 24 24" class="icon-spin"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
       <span id="compile-label">Compile</span>
@@ -69,6 +69,7 @@
         <div class="sidebar-tabs" role="tablist">
           <button class="sidebar-tab active" data-view="files" role="tab" aria-selected="true">Files</button>
           <button class="sidebar-tab" data-view="search" role="tab" aria-selected="false" title="Search in the project (Ctrl+Shift+F)">Search</button>
+          <button class="sidebar-tab" data-view="outline" role="tab" aria-selected="false" title="Chapters and sections of the document">Outline</button>
         </div>
         <div class="spacer"></div>
         <div class="tb-group" id="file-actions">
@@ -85,6 +86,9 @@
       </div>
       <div class="pane-body" id="file-tree" data-view-body="files">
         <p class="empty-state">No project open.</p>
+      </div>
+      <div class="pane-body outline-view" id="outline-view" data-view-body="outline" hidden>
+        <div id="outline-list"><p class="empty-state">No project open.</p></div>
       </div>
       <div class="search-view" id="search-view" data-view-body="search" hidden>
         <div class="search-form">
@@ -132,7 +136,8 @@
 
           <h2>Shortcuts</h2>
           <dl class="shortcuts">
-            <dt><kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>Save all files and compile</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>Save all files</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></dt><dd>Save all files and compile</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd></dt><dd>Bold / italic / underline (toolbar above the editor)</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>M</kbd></dt><dd>Inline math $…$</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></dt><dd>Add a reference ([1] button)</dd>

@@ -178,9 +178,10 @@ export function registerCompletions(monaco, { buffers }) {
       }
 
       // A command name: \partial
-      const cmd = /\\[A-Za-z@]*$/.exec(before);
-      if (cmd) {
-        const range = new monaco.Range(lineNumber, position.column - cmd[0].length, lineNumber, position.column);
+      // An even run of backslashes is line breaks (\\), not a command: suggest nothing.
+      const cmd = /(\\+)([A-Za-z@]*)$/.exec(before);
+      if (cmd && cmd[1].length % 2 === 1) {
+        const range = new monaco.Range(lineNumber, position.column - cmd[2].length - 1, lineNumber, position.column);
         return { suggestions: commandItems(range) };
       }
       return { suggestions: [] };

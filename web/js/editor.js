@@ -3,6 +3,7 @@
 // survive tab switches. Images and binary files open in a read-only viewer.
 
 import { EMPTY_IMAGE_ARGUMENT, registerCompletions } from "./completion.js";
+import { initMathPreview } from "./math-preview.js";
 import { registerLanguages, TOKEN_RULES } from "./latex-lang.js";
 import { attachSpell, initSpell } from "./spell.js";
 import { confirmDialog } from "./ui.js";
@@ -27,7 +28,7 @@ let activePath = null;
 let modelCounter = 0;
 const tabs = new Map(); // path -> { path, kind, model, viewState, encoding, savedVersion, data }
 let problemsByPath = new Map(); // path -> build problems located in that file
-let handlers = { onDirtyChange() {}, onActiveChange() {}, onCursor() {} };
+let handlers = { onDirtyChange() {}, onActiveChange() {}, onCursor() {}, onEdit() {} };
 let lastDirty = false;
 
 const extOf = (path) => (path.includes(".") ? path.split(".").pop().toLowerCase() : "");
@@ -140,6 +141,7 @@ export async function initEditor(options) {
       setTimeout(() => editor.trigger("image-path", "editor.action.triggerSuggest", {}), 0);
     }
   });
+  initMathPreview(monaco, editor);
   // The themed DOM only exists once a file is shown, so share the colours then too.
   editor.onDidChangeModel(shareThemeVariables);
   shareThemeVariables();
@@ -192,6 +194,7 @@ export function openTab(path, data, { focus = true } = {}) {
       tab.model.onDidChangeContent(() => {
         renderTabs();
         notifyDirty();
+        handlers.onEdit(path);
       });
       if (extOf(path) === "tex") attachSpell(tab.model);
     }

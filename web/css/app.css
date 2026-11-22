@@ -842,6 +842,27 @@ kbd {
 .search-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .search-match mark { border-radius: 2px; background: rgba(255, 196, 0, 0.4); color: inherit; }
 
+/* Outline view: headings indented by level */
+.outline-view { padding: 4px 0; }
+.outline-item {
+  display: block;
+  width: 100%;
+  padding: 3px 10px;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.outline-item:hover, .outline-item:focus-visible { background: var(--surface-alt); outline: none; }
+.outline-item.active { background: var(--accent-soft); color: var(--accent); }
+.outline-item.level-0, .outline-item.level-1 { font-weight: 600; }
+.outline-item.level-3, .outline-item.level-4 { color: var(--text-muted); font-size: 12px; }
+.outline-item.active.level-3, .outline-item.active.level-4 { color: var(--accent); }
+
 /* ---------------------------------------------------------------------
    Dialogs, context menu, toasts
    --------------------------------------------------------------------- */
@@ -1119,3 +1140,20 @@ kbd {
 .monaco-editor .spell-error {
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3' height='3' width='6'%3E%3Cpath d='m0 2.5 1.5-1.5 1.5 1.5 1.5-1.5 1.5 1.5' fill='none' stroke='%23d63384' stroke-width='.8'/%3E%3C/svg%3E") repeat-x bottom left;
 }
+
+/* Equation preview under the math the cursor is in (web/js/math-preview.js) */
+.math-preview {
+  max-width: 640px;
+  max-height: 260px;
+  padding: 8px 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  color: var(--text);
+  font-size: 15px;
+}
+.math-preview[hidden] { display: none; }
+.math-preview mjx-container { margin: 0 !important; }
+.math-preview.error { color: var(--danger); font: 12px var(--font-mono); }

@@ -84,6 +84,14 @@ PACKAGES = [
         "dest": "dictionaries/es",
         "files": {"index.aff": "index.aff", "index.dic": "index.dic", "license": "license"},
     },
+    {
+        # equation preview: one self-contained file (TeX input with all extensions, SVG output)
+        "name": "mathjax",
+        "version": "3.2.2",
+        "integrity": "sha512-Bt+SSVU8eBG27zChVewOicYs7Xsdt40qm4+UpHyX7k0/O9NliPc+x77k1/FEsPsjKPZGJvtRZM1vO+geW0OhGw==",
+        "dest": "mathjax",
+        "files": {"es5/tex-svg-full.js": "tex-svg-full.js", "LICENSE": "LICENSE"},
+    },
 ]
 
 MANIFEST = VENDOR / "VERSIONS.json"
