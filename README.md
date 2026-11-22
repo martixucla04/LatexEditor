@@ -35,6 +35,10 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
   unchanged projects are not rebuilt and a `.bib`-only change skips the first LaTeX run
 - PDF preview that keeps its zoom and position; SyncTeX (Ctrl+Alt+J ↔ double-click in the PDF)
 - Problems panel with clickable errors and squiggles in the editor
+- **Error report** tab next to Problems and Log: the last build's errors written up for an AI
+  assistant (engine and main file, each error with the source lines around it and where TeX
+  stopped, the warnings, and the matching part of the log). **Copy** puts it on the clipboard to
+  paste into Claude
 - **Outline** to the right of the PDF (hide/show with the button at the end of the PDF toolbar):
   parts, chapters, sections and subsections in reading order (following `\input`/`\include`
   from the main file, unsaved edits included). A blue bar marks the heading the editor cursor is

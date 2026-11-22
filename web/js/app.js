@@ -412,6 +412,41 @@ function setBuildLog(text) {
 function showBuildProblems(problems) {
   setProblems(problems);
   editor.setProblems(problems || []);
+  updateErrorReport(problems);
+}
+
+// "Error report" tab: the build's errors written up (app/report.py) to paste into Claude.
+let reportRequest = 0;
+async function updateErrorReport(problems) {
+  const request = ++reportRequest;
+  const relevant = (problems || []).filter((p) => p.severity !== "info");
+  let text = "";
+  if (relevant.length) {
+    try {
+      text = await call("error_report", relevant);
+    } catch {
+      text = ""; // project closed meanwhile
+    }
+  }
+  if (request !== reportRequest) return;
+  $("report-text").textContent = text;
+  $("report-text").hidden = !text;
+  $("report-empty").hidden = !!text;
+  $("btn-copy-report").disabled = !text;
+}
+
+async function copyErrorReport() {
+  const text = $("report-text").textContent;
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // no clipboard permission: copy the selected text the old way
+    getSelection().selectAllChildren($("report-text"));
+    document.execCommand("copy");
+    getSelection().removeAllRanges();
+  }
+  toast("Error report copied. Paste it into Claude.", "success");
 }
 
 async function openProblem(problem) {
@@ -671,6 +706,7 @@ function initToolbar() {
   initDropOverlay();
   $("btn-save").addEventListener("click", saveAll);
   $("btn-compile").addEventListener("click", onCompileButton);
+  $("btn-copy-report").addEventListener("click", copyErrorReport);
   $("btn-sync").addEventListener("click", forwardSearch);
   $("btn-settings").addEventListener("click", openSettings);
   onInverseSearch(inverseSearch);

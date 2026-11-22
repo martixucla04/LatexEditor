@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from . import __version__, outline, references, reftypes, search, synctex, tables
+from . import __version__, outline, references, reftypes, report, search, synctex, tables
 from .builder import Builder, BuildResult
 from .completions import scan_project
 from .errors import UserError
@@ -359,6 +359,11 @@ class Api:
                     page, y = where[(item["file"], item["line"])]
                     item["pdf"] = {"page": page, "y": y}
         return items
+
+    def error_report(self, problems: list):
+        """The last build's errors and warnings as Markdown to paste into an AI chat (app/report.py)."""
+        engine = (self.app_info()["engine"] or {}).get("version")
+        return report.error_report(self._require_project(), problems or [], engine)
 
     def completion_data(self):
         """Labels, bibliography entries, user macros and files for autocomplete."""

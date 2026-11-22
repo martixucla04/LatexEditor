@@ -166,6 +166,7 @@
             Problems <span class="badge" id="problem-count">0</span>
           </button>
           <button class="panel-tab" data-panel="log" role="tab" aria-selected="false">Log</button>
+          <button class="panel-tab" data-panel="report" role="tab" aria-selected="false" title="The errors written up to paste into Claude">Error report</button>
         </div>
         <div class="pane-body problems" data-panel-body="problems">
           <div class="problem-filters" id="problem-filters" hidden></div>
@@ -175,6 +176,14 @@
         <div class="pane-body log" data-panel-body="log" hidden>
           <p class="empty-state" id="log-empty">The LuaLaTeX log appears here after compiling.</p>
           <pre class="log-text" id="log-text" hidden></pre>
+        </div>
+        <div class="pane-body report" data-panel-body="report" hidden>
+          <div class="report-bar">
+            <span>The errors with their code and log lines, ready to paste into Claude.</span>
+            <button class="btn primary" id="btn-copy-report" disabled>Copy</button>
+          </div>
+          <p class="empty-state" id="report-empty">No errors or warnings to report. Compile the document first.</p>
+          <pre class="log-text" id="report-text" hidden></pre>
         </div>
       </section>
     </section>

@@ -1217,3 +1217,19 @@ kbd {
 @media (max-width: 640px) { .table-options { grid-template-columns: 1fr; } }
 .modal.tables label.ref-field.checkbox { grid-template-columns: 16px 1fr; gap: 10px; }
 .modal.tables label.ref-field.checkbox input { order: -1; }
+
+/* Error report tab (to paste into Claude) */
+.pane-body.report { display: flex; flex-direction: column; user-select: text; }
+.report-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.report-bar .btn { height: 26px; padding: 0 14px; }
+.pane-body.report .log-text { flex: 1; min-height: 0; overflow: auto; font: 12px/1.5 var(--font-mono); }
