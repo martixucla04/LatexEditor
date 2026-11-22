@@ -27,7 +27,9 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
   unchanged projects are not rebuilt and a `.bib`-only change skips the first LaTeX run
 - PDF preview that keeps its zoom and position; SyncTeX (Ctrl+Alt+J ↔ double-click in the PDF)
 - Problems panel with clickable errors and squiggles in the editor
-- LaTeX/BibTeX highlighting; autocomplete for commands, environments, `\ref`, `\cite`, files
+- LaTeX/BibTeX highlighting; autocomplete for commands, environments, `\ref`, `\cite`, files.
+  The project's images pop up as soon as the cursor is in an empty `\includegraphics{}` (e.g. from
+  the `figure` snippet); type part of the file name (`em01`) to find one in any subfolder
 - Project-wide search and replace (Ctrl+Shift+F)
 - Spell check: English (US/UK), Català, Español; language from babel/polyglossia
 - Settings (Ctrl+,): light/dark theme, font size, word wrap, projects folder

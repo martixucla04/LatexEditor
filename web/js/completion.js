@@ -10,6 +10,8 @@ import { CLASSES, COMMANDS, ENVIRONMENTS, PACKAGES } from "./latex-data.js";
 const REF_COMMANDS = /^(?:ref|eqref|autoref|[cC]ref|cpageref|pageref|nameref|vref|labelcref|subref)$/;
 const CITE_COMMANDS = /^(?:[cC]ite[a-z]*|[pP]arencite|[tT]extcite|[aA]utocite|[fF]ootcite|[sS]martcite|supercite|nocite|fullcite|footfullcite)s?$/;
 const IMAGE_EXT = /\.(png|jpe?g|pdf|eps|svg|gif|bmp)$/i;
+// Text before the cursor that ends in an empty image argument: \includegraphics[width=…]{
+export const EMPTY_IMAGE_ARGUMENT = /\\(?:includegraphics|includesvg|includepdf)\*?(?:\[[^\]]*\]){0,2}\{$/;
 const LABEL = /\\label\{([^}\s]+)\}/g;
 
 let project = { labels: [], citations: [], commands: [], environments: [], files: [] };
@@ -75,8 +77,10 @@ export function registerCompletions(monaco, { buffers }) {
         range,
       }));
     }
+    // filterText starts with the file name, so typing "em01" finds Imagenes/Introduccio/em01.jpg
     const fileItems = (filter, transform) => project.files.filter(filter).map((f) => ({
       label: transform(f), kind: Kind.File, insertText: transform(f), range,
+      filterText: `${f.split("/").pop()} ${transform(f)}`,
     }));
     switch (cmd) {
       case "input": case "include": case "subfile": case "includeonly": case "import":

@@ -2,7 +2,7 @@
 // view state (cursor/scroll) and saved version, so dirty state and position
 // survive tab switches. Images and binary files open in a read-only viewer.
 
-import { registerCompletions } from "./completion.js";
+import { EMPTY_IMAGE_ARGUMENT, registerCompletions } from "./completion.js";
 import { registerLanguages, TOKEN_RULES } from "./latex-lang.js";
 import { attachSpell, initSpell } from "./spell.js";
 import { confirmDialog } from "./ui.js";
@@ -131,7 +131,15 @@ export async function initEditor(options) {
     snippetSuggestions: "inline",
     dropIntoEditor: { enabled: false }, // dropped files are imported/added, not pasted as text
   });
-  editor.onDidChangeCursorPosition((e) => handlers.onCursor(e.position));
+  editor.onDidChangeCursorPosition((e) => {
+    handlers.onCursor(e.position);
+    // A figure snippet puts the cursor in an empty \includegraphics{}: list the project's images.
+    const line = editor.getModel()?.getLineContent(e.position.lineNumber) ?? "";
+    const col = e.position.column - 1;
+    if (line[col] === "}" && EMPTY_IMAGE_ARGUMENT.test(line.slice(0, col))) {
+      setTimeout(() => editor.trigger("image-path", "editor.action.triggerSuggest", {}), 0);
+    }
+  });
   // The themed DOM only exists once a file is shown, so share the colours then too.
   editor.onDidChangeModel(shareThemeVariables);
   shareThemeVariables();
