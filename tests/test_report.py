@@ -40,4 +40,4 @@ def test_report_of_a_real_build(make_project, settings):
     assert "> 2 | Two \\foo{x} three." in text  # the source line, marked
     assert "  1 | One." in text and "  4 | Four." in text
     assert "## Warnings" in text and "fig:none" in text
-    assert "## From the LuaLaTeX log" in text and "ch.tex:2: Undefined control sequence." in text
+    assert "## From the LaTeX log" in text and "ch.tex:2: Undefined control sequence." in text

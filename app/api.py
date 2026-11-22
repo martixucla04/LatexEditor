@@ -21,16 +21,16 @@ from .builder import Builder, BuildResult
 from .completions import scan_project
 from .errors import UserError
 from .fsutil import reveal_in_explorer
-from .logparser import collect_problems
+from .logparser import LATEX_ENGINES, collect_problems
 from .pdfserver import PdfServer
 from .project import Project
 from .settings import Settings
 from .workspace import check_link_folder, export_zip, import_zip
 
 
-def detect_engine():
-    """Return the LuaLaTeX path and version banner, or None if it is not installed."""
-    path = shutil.which("lualatex")
+def detect_engine(name: str = "lualatex"):
+    """Return the engine's path and version banner, or None if it is not installed."""
+    path = shutil.which(name)
     if path is None:
         return None
     try:
@@ -57,6 +57,7 @@ class Api:
     def __init__(self, settings: Settings | None = None):
         self._window = None
         self._engine = None
+        self._engines: dict[str, dict | None] = {}  # detect_engine() per engine name
         self._settings = settings or Settings()
         self._project: Project | None = None
         self._dirty = False
@@ -362,12 +363,31 @@ class Api:
 
     def error_report(self, problems: list):
         """The last build's errors and warnings as Markdown to paste into an AI chat (app/report.py)."""
-        engine = (self.app_info()["engine"] or {}).get("version")
-        return report.error_report(self._require_project(), problems or [], engine)
+        project = self._require_project()
+        engine = (self.engine_info(project.engine) or {}).get("version")
+        return report.error_report(project, problems or [], engine)
 
     def completion_data(self):
         """Labels, bibliography entries, user macros and files for autocomplete."""
         return scan_project(self._require_project().root)
+
+    def engines(self):
+        """The compilers a project can use: [{id, label}]."""
+        return [{"id": k, "label": v} for k, v in LATEX_ENGINES.items()]
+
+    def engine_info(self, name: str):
+        """{path, version} of an engine, or None if it is not installed (asked once per run)."""
+        if name not in LATEX_ENGINES:
+            raise UserError(f"Unknown compiler: {name}")
+        if name not in self._engines:
+            self._engines[name] = detect_engine(name)
+        return self._engines[name]
+
+    def set_engine(self, name: str):
+        """Compile this project with `name` (lualatex, pdflatex, xelatex) from now on."""
+        project = self._require_project()
+        project.set_engine(name)
+        return project.info()
 
     def set_main_file(self, rel: str):
         project = self._require_project()
@@ -386,10 +406,11 @@ class Api:
         main = project.main_file
         if not main:
             raise UserError("No main file is set. Right-click a .tex file and choose \"Set as main file\".")
-        if shutil.which("lualatex") is None:
-            raise UserError("LuaLaTeX was not found. Install MiKTeX and make sure lualatex is on the PATH.")
+        engine = project.engine
+        if shutil.which(engine) is None:
+            raise UserError(f"{LATEX_ENGINES[engine]} was not found. Install MiKTeX and make sure {engine} is on the PATH.")
 
-        builder = Builder(project.root, main, on_event=self._emit)
+        builder = Builder(project.root, main, on_event=self._emit, engine=engine)
         with self._builder_lock:
             previous, self._builder = self._builder, builder
         if previous is not None:

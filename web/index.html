@@ -42,7 +42,12 @@
 
     <div class="spacer"></div>
 
-    <button class="tb-btn primary" id="btn-compile" disabled title="Save and compile with LuaLaTeX (Ctrl+Shift+S)">
+    <select class="tb-select" id="engine-select" disabled title="Compiler for this project" aria-label="Compiler">
+      <option value="lualatex">LuaLaTeX</option>
+      <option value="pdflatex">pdfLaTeX</option>
+      <option value="xelatex">XeLaTeX</option>
+    </select>
+    <button class="tb-btn primary" id="btn-compile" disabled title="Save and compile (Ctrl+Shift+S)">
       <svg viewBox="0 0 24 24" class="filled icon-play"><path d="M7 4.5v15l12-7.5z"/></svg>
       <svg viewBox="0 0 24 24" class="icon-spin"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
       <span id="compile-label">Compile</span>

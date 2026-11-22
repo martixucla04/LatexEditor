@@ -44,6 +44,8 @@ function setProjectUi(info) {
   name.disabled = !open;
   $("btn-export").disabled = !open;
   $("btn-compile").disabled = !open;
+  $("engine-select").disabled = !open;
+  if (open) showEngine(info.engine);
   $("btn-sync").disabled = !open;
   for (const id of ["btn-new-file", "btn-new-folder", "btn-add-files"]) $(id).disabled = !open;
   $("welcome").hidden = open;
@@ -238,10 +240,40 @@ async function chooseMainFile(candidates) {
   if (choice) await setMainFile(choice);
 }
 
+// The project's compiler in the toolbar and its version in the status bar.
+async function showEngine(name) {
+  const select = $("engine-select");
+  select.value = name;
+  $("btn-compile").title = `Save and compile with ${ENGINE_LABELS[name]} (Ctrl+Shift+S)`;
+  const status = $("status-engine");
+  try {
+    const info = await call("engine_info", name);
+    if ($("engine-select").value !== name) return; // changed again meanwhile
+    status.textContent = info ? info.version.split(" (")[0] : `${ENGINE_LABELS[name]} not found`;
+    status.title = info ? info.path : `Install MiKTeX and make sure ${name} is on the PATH`;
+    status.className = info ? "" : "warning";
+  } catch {
+    // keep the previous text
+  }
+}
+
+async function changeEngine() {
+  const name = $("engine-select").value;
+  try {
+    project = await call("set_engine", name);
+    showEngine(project.engine);
+    toast(`${project.name} now compiles with ${ENGINE_LABELS[name]}. The next Compile is a full build.`, "success");
+  } catch (err) {
+    showError(err);
+    if (project) showEngine(project.engine);
+  }
+}
+
 async function setMainFile(path) {
   try {
     project = await call("set_main_file", path);
     tree.setTree(project.tree, project.main_file);
+    showEngine(project.engine); // a "% !TeX program" line in the new main file may pick another one
     refreshOutline();
     toast(`Main file: ${path}`, "success");
   } catch (err) {
@@ -386,8 +418,11 @@ async function saveAll() {
 // Compiling
 // ---------------------------------------------------------------------------
 
+const ENGINE_LABELS = { lualatex: "LuaLaTeX", pdflatex: "pdfLaTeX", xelatex: "XeLaTeX" };
 const TOOL_LABELS = {
   lualatex: "Running LuaLaTeX",
+  pdflatex: "Running pdfLaTeX",
+  xelatex: "Running XeLaTeX",
   biber: "Running biber (bibliography)",
   bibtex: "Running BibTeX (bibliography)",
   "makeglossaries-lite": "Building glossaries",
@@ -399,7 +434,7 @@ function setBuilding(on) {
   const button = $("btn-compile");
   button.classList.toggle("building", on);
   $("compile-label").textContent = on ? "Stop" : "Compile";
-  button.title = on ? "Stop compiling" : "Save and compile with LuaLaTeX (Ctrl+Shift+S)";
+  button.title = on ? "Stop compiling" : `Save and compile with ${ENGINE_LABELS[project?.engine] || "LaTeX"} (Ctrl+Shift+S)`;
 }
 
 function setBuildLog(text) {
@@ -458,7 +493,7 @@ async function openProblem(problem) {
 window.onBuildEvent = (event) => {
   if (!building) return;
   if (event.type === "step") {
-    const runs = event.tool === "lualatex" && event.run > 0 ? ` (run ${event.run + 1})` : "";
+    const runs = event.tool in ENGINE_LABELS && event.run > 0 ? ` (run ${event.run + 1})` : "";
     setStatus(`${TOOL_LABELS[event.tool] || `Running ${event.tool}`}${runs}…`);
   } else if (event.type === "slow") {
     setStatus(`Still running ${event.tool}… If MiKTeX shows a package-install dialog, answer it.`, "warning");
@@ -707,6 +742,7 @@ function initToolbar() {
   $("btn-save").addEventListener("click", saveAll);
   $("btn-compile").addEventListener("click", onCompileButton);
   $("btn-copy-report").addEventListener("click", copyErrorReport);
+  $("engine-select").addEventListener("change", changeEngine);
   $("btn-sync").addEventListener("click", forwardSearch);
   $("btn-settings").addEventListener("click", openSettings);
   onInverseSearch(inverseSearch);

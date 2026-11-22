@@ -66,7 +66,7 @@ def error_report(project: Project, problems: list[dict], engine: str | None = No
         return ""
     main = project.main_file or "(not set)"
     out = [
-        f"I'm compiling a LaTeX document with {engine or 'LuaLaTeX'} (main file: {main}) "
+        f"I'm compiling a LaTeX document with {engine or 'LaTeX'} (main file: {main}) "
         + ("and it gives these errors. Please explain what is wrong and how to fix each one."
            if errors else "and it gives these warnings. Please explain what they mean and how to fix them."),
     ]
@@ -76,7 +76,7 @@ def error_report(project: Project, problems: list[dict], engine: str | None = No
         where = _where(p)
         if where:
             out.append(f"Where: {where}")
-        if p.get("source") and p["source"] != "lualatex":
+        if p.get("source") and p["source"] != "latex":
             out.append(f"Reported by: {p['source']}")
         code = _source(project, p["file"], p["line"]) if p.get("file") and p.get("line") else ""
         if code:
@@ -101,5 +101,5 @@ def error_report(project: Project, problems: list[dict], engine: str | None = No
         log = ""
     excerpt = _log_excerpt(log) if errors else ""
     if excerpt:
-        out += ["", "## From the LuaLaTeX log", "```", excerpt, "```"]
+        out += ["", "## From the LaTeX log", "```", excerpt, "```"]
     return "\n".join(out) + "\n"

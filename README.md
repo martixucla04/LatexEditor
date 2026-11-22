@@ -31,7 +31,10 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
   `table` with caption and label. A live preview shows the LaTeX; missing `\usepackage` lines
   (tabularx, longtable, booktabs) can be added to the preamble. "Paste as text" pastes the
   cells as they are. The options are remembered
-- LuaLaTeX builds with biber/BibTeX, glossaries and index run automatically when needed;
+- **Compiler per project**: LuaLaTeX (default), pdfLaTeX or XeLaTeX, chosen in the dropdown next
+  to Compile and saved with the project. Without a choice, a `% !TeX program = xelatex` line in the
+  main file decides (as in TeXstudio and Overleaf). The status bar shows the chosen engine's version
+- Builds with biber/BibTeX, glossaries and index run automatically when needed;
   unchanged projects are not rebuilt and a `.bib`-only change skips the first LaTeX run
 - PDF preview that keeps its zoom and position; SyncTeX (Ctrl+Alt+J ↔ double-click in the PDF)
 - Problems panel with clickable errors and squiggles in the editor
@@ -57,7 +60,7 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
 ## Requirements
 
 - Windows 10/11 with the WebView2 runtime (included in Windows 11)
-- MiKTeX with `lualatex`, `biber`, `bibtex`, `makeindex`, `makeglossaries-lite`, `synctex`
+- MiKTeX with `lualatex` (or `pdflatex`/`xelatex`), `biber`, `bibtex`, `makeindex`, `makeglossaries-lite`, `synctex`
   on the PATH (Perl is **not** needed)
 - To run from source or build: Python 3.13
 

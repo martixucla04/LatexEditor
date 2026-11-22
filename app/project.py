@@ -8,6 +8,7 @@ from pathlib import Path, PurePosixPath
 
 from .errors import UserError
 from .fsutil import atomic_write_bytes, move_to_trash
+from .logparser import LATEX_ENGINES
 from .workspace import HIDDEN_NAMES, INVALID_CHARS, RESERVED, iter_project_files
 
 CONFIG_NAME = ".latexeditor.json"
@@ -30,6 +31,9 @@ POLYGLOSSIA = re.compile(r"^[^%\n]*\\set(?:main|default)language(?:\[[^\]]*\])?\
 
 MAGIC_ROOT = re.compile(r"^\s*%\s*!\s*TeX\s+root\s*=\s*(.+?)\s*$", re.I | re.M)
 DOCUMENTCLASS = re.compile(r"^[^%\n]*\\documentclass", re.M)
+# "% !TeX program = xelatex" (TeXstudio, TeXShop and Overleaf read it too; TS-program is TeXShop's)
+MAGIC_PROGRAM = re.compile(r"^\s*%\s*!\s*TeX\s+(?:TS-)?program\s*=\s*(\w+)", re.I | re.M)
+DEFAULT_ENGINE = "lualatex"
 
 
 def _decode(data: bytes) -> tuple[str, str]:
@@ -95,6 +99,28 @@ class Project:
         if path.suffix.lower() != ".tex" or not path.is_file():
             raise UserError("The main file must be an existing .tex file.")
         self.config["main_file"] = self.rel(path)
+        self._save_config()
+
+    @property
+    def engine(self) -> str:
+        """The TeX engine to compile with: the one chosen for this project, else a
+        "% !TeX program = …" line in the main file, else LuaLaTeX."""
+        chosen = self.config.get("engine")
+        if chosen in LATEX_ENGINES:
+            return chosen
+        main = self.main_file
+        try:
+            head = (self.root / main).read_text(encoding="utf-8", errors="replace")[:4096] if main else ""
+        except OSError:
+            head = ""
+        m = MAGIC_PROGRAM.search(head)
+        program = m.group(1).lower() if m else ""
+        return program if program in LATEX_ENGINES else DEFAULT_ENGINE
+
+    def set_engine(self, engine: str) -> None:
+        if engine not in LATEX_ENGINES:
+            raise UserError(f"Unknown compiler: {engine}")
+        self.config["engine"] = engine
         self._save_config()
 
     def detect_language(self) -> str:
@@ -299,6 +325,7 @@ class Project:
             "root": str(self.root),
             "main_file": main,
             "main_candidates": candidates,
+            "engine": self.engine,
             "tree": self.tree(),
             "has_pdf": bool(pdf and pdf.is_file()),
         }

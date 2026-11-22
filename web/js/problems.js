@@ -42,7 +42,7 @@ export function counts() {
 function location(p) {
   if (p.file) return p.line ? `${p.file}:${p.line}` : p.file;
   if (p.external) return `${p.external.split(/[\\/]/).pop()}${p.line ? `:${p.line}` : ""}`;
-  return p.source !== "lualatex" ? p.source : "";
+  return p.source !== "latex" ? p.source : "";
 }
 
 function renderFilters(c) {

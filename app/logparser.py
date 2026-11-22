@@ -1,4 +1,4 @@
-"""Turn LuaLaTeX logs and biber/BibTeX transcripts into a list of problems.
+"""Turn LaTeX logs and biber/BibTeX transcripts into a list of problems.
 
 A problem has a severity ("error", "warning" or "info" for typesetting notes
 such as overfull boxes), a message, and where possible a project-relative file
@@ -16,6 +16,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
 WRAP_WIDTH = 79
+# The TeX engines a project can compile with (Problem.source "latex" covers all of them).
+LATEX_ENGINES = {"lualatex": "LuaLaTeX", "pdflatex": "pdfLaTeX", "xelatex": "XeLaTeX"}
 
 FILE_LINE_ERROR = re.compile(r"^((?:[A-Za-z]:)?[^:]*?\.\w+):(\d+): (.*)$")
 BANG_ERROR = re.compile(r"^! (.*)$")
@@ -41,7 +43,7 @@ class Problem:
     message: str
     file: str | None = None  # project-relative POSIX path
     line: int | None = None
-    source: str = "lualatex"
+    source: str = "latex"
     context: str = ""  # source text before the error point (TeX's "l.N ..." line)
     external: str | None = None  # file outside the project (a package), for display only
 
@@ -107,7 +109,7 @@ def parse_latex_log(text: str, root: Path) -> list[Problem]:
 
     def add(severity, message, raw_file, line, context=""):
         rel, external = locator.locate(raw_file)
-        problems.append(Problem(severity, message.strip(), rel, line, "lualatex", context, external))
+        problems.append(Problem(severity, message.strip(), rel, line, "latex", context, external))
 
     def block_end(start: int) -> int:
         """Index of the blank line ending the message block that starts at `start`."""
@@ -275,7 +277,7 @@ def collect_problems(root: Path, build_dir: Path, jobname: str, log: str | None 
         problems += parse_bibtex_blg(blg, root)
 
     for step in steps:
-        if step.tool != "lualatex" and step.exit_code not in (0, None) \
+        if step.tool not in LATEX_ENGINES and step.exit_code not in (0, None) \
                 and not any(p.source == step.tool and p.severity == "error" for p in problems):
             problems.append(Problem("error", f"{step.tool} failed (exit code {step.exit_code}). See the Log tab.",
                                     source=step.tool))

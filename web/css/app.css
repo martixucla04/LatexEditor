@@ -1233,3 +1233,18 @@ kbd {
 }
 .report-bar .btn { height: 26px; padding: 0 14px; }
 .pane-body.report .log-text { flex: 1; min-height: 0; overflow: auto; font: 12px/1.5 var(--font-mono); }
+
+/* Compiler choice next to Compile */
+.tb-select {
+  height: 30px;
+  margin-right: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.tb-select:disabled { opacity: 0.5; cursor: default; }

@@ -1,20 +1,22 @@
-"""LuaLaTeX build orchestrator (latexmk needs Perl, which MiKTeX setups often lack).
+"""LaTeX build orchestrator (latexmk needs Perl, which MiKTeX setups often lack).
+
+The engine is the project's choice: lualatex (default), pdflatex or xelatex.
 
 One build:
-    lualatex                       always (first run)
+    engine                         always (first run)
     biber   | bibtex               when the bibliography inputs changed
     makeglossaries-lite            when glossary entries changed
     makeindex                      when index entries changed
-    lualatex                       again while the log asks for a rerun (max 5 runs)
+    engine                         again while the log asks for a rerun (max 5 runs)
 
 Everything is written to <project>/.build. The commands run from the project
 root, so \\input, \\includegraphics and .bib paths resolve like on Overleaf.
 Hashes of each auxiliary tool's inputs are kept in .build/.latexeditor-build.json
-so a typical Ctrl+S build is a single lualatex run.
+so a typical build is a single LaTeX run.
 
 Shortcuts, based on a size/mtime fingerprint of every project file:
     nothing changed since a clean build   -> no run at all ("Up to date")
-    only .bib files changed               -> biber | bibtex, then lualatex (skips the first run)
+    only .bib files changed               -> biber | bibtex, then LaTeX (skips the first run)
 LaTeX itself cannot re-typeset just one changed file: page numbers, references and
 the table of contents depend on the whole document.
 """
@@ -29,7 +31,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path, PurePosixPath
 
-from .logparser import collect_problems
+from .logparser import LATEX_ENGINES, collect_problems
 from .project import BUILD_DIR
 from .workspace import iter_project_files
 
@@ -105,8 +107,9 @@ def _kill_tree(proc: subprocess.Popen) -> None:
 class Builder:
     """Runs one build. Call run() in a worker thread; cancel() from any thread."""
 
-    def __init__(self, root: Path, main_rel: str, on_event=None):
+    def __init__(self, root: Path, main_rel: str, on_event=None, engine: str = "lualatex"):
         self.root = Path(root)
+        self.engine = engine if engine in LATEX_ENGINES else "lualatex"
         self.main_rel = main_rel
         self.jobname = PurePosixPath(main_rel).stem
         self.build_dir = self.root / BUILD_DIR
@@ -170,9 +173,9 @@ class Builder:
 
     # -- tools ---------------------------------------------------------------------
 
-    def _lualatex(self) -> Step:
+    def _latex(self) -> Step:
         self.latex_runs += 1
-        return self._run("lualatex", [
+        return self._run(self.engine, [
             "-interaction=nonstopmode", "-file-line-error", "-synctex=1",
             f"-output-directory={BUILD_DIR}", f"-jobname={self.jobname}", self.main_rel,
         ], self.root)
@@ -278,7 +281,8 @@ class Builder:
         pdf = self._out(".pdf")
         state = self._load_state()
         inputs = self._fingerprint()  # taken before building, so edits made meanwhile count next time
-        previous = state.get("inputs") if state.get("main") == self.main_rel and pdf.exists() else None
+        same_setup = state.get("main") == self.main_rel and state.get("engine", "lualatex") == self.engine
+        previous = state.get("inputs") if same_setup and pdf.exists() else None
         changed = None if previous is None else {
             rel for rel in previous.keys() | inputs.keys() if previous.get(rel) != inputs.get(rel)}
 
@@ -296,10 +300,10 @@ class Builder:
             if changed and all(rel.lower().endswith(".bib") for rel in changed):
                 if self._aux_tools(state, self._read_log()):
                     self._save_state(state)
-                    step = self._lualatex()
+                    step = self._latex()
 
             if step is None:
-                step = self._lualatex()
+                step = self._latex()
             log = self._read_log()
             produced = pdf.exists() and pdf.stat().st_mtime >= started_at - 1
 
@@ -311,7 +315,7 @@ class Builder:
                 pending = 1 if aux_ran else 0
                 while self.latex_runs < MAX_LATEX_RUNS and (pending or (step.exit_code == 0 and RERUN.search(log))):
                     pending = max(0, pending - 1)
-                    step = self._lualatex()
+                    step = self._latex()
                     log = _read(self._out(".log")).decode("utf-8", errors="replace")
                     if step.exit_code != 0:
                         break
@@ -329,7 +333,7 @@ class Builder:
         produced = pdf.exists() and pdf.stat().st_mtime >= started_at - 1
         problems = collect_problems(self.root, self.build_dir, self.jobname, log, self.steps)
         errors = sum(p.severity == "error" for p in problems)
-        failed_tool = next((s for s in self.steps if s.tool != "lualatex" and s.exit_code not in (0, None)), None)
+        failed_tool = next((s for s in self.steps if s.tool not in LATEX_ENGINES and s.exit_code not in (0, None)), None)
         if not produced:
             status, message = "failed", "Compilation failed: no PDF was produced"
         elif step.exit_code != 0 or errors:
@@ -342,7 +346,7 @@ class Builder:
 
         # Remember what this build saw; only a clean build may be skipped next time
         # (after errors, rebuilding may help, e.g. once a missing package is installed).
-        state.update(inputs=inputs, main=self.main_rel, clean=status == "success")
+        state.update(inputs=inputs, main=self.main_rel, engine=self.engine, clean=status == "success")
         self._save_state(state)
         return BuildResult(status, message, str(pdf) if produced else None, log, duration, self.steps,
                            [p.to_dict() for p in problems])
