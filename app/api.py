@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from . import __version__, outline, references, reftypes, report, search, synctex, tables
+from . import __version__, images, outline, plots, references, reftypes, report, search, synctex, tables
 from .builder import Builder, BuildResult
 from .completions import scan_project
 from .errors import UserError
@@ -220,6 +220,26 @@ class Api:
         count = export_zip(project.root, dest, project.pdf_path if include_pdf else None)
         return {"path": str(dest), "count": count}
 
+    def save_pdf_dialog(self):
+        """Copy the compiled PDF to a place the user picks; returns the path, or None if cancelled."""
+        project = self._require_project()
+        pdf = project.pdf_path
+        if pdf is None or not pdf.is_file():
+            raise UserError("Compile the document first: there is no PDF yet.")
+        dest = self._window.create_file_dialog(
+            webview.FileDialog.SAVE, save_filename=f"{project.name}.pdf", file_types=("PDF documents (*.pdf)",)
+        )
+        if not dest:
+            return None
+        dest = Path(dest[0] if isinstance(dest, (list, tuple)) else dest)
+        if dest.suffix.lower() != ".pdf":
+            dest = dest.with_name(dest.name + ".pdf")
+        try:
+            shutil.copyfile(pdf, dest)
+        except OSError as exc:  # e.g. the old copy is open in a PDF reader
+            raise UserError(f"Could not save {dest.name}: {exc.strerror or exc}") from exc
+        return str(dest)
+
     def reveal(self, rel: str = ""):
         reveal_in_explorer(self._require_project().path(rel))
 
@@ -331,6 +351,43 @@ class Api:
         return {"latex": tables.to_latex(rows, options), "rows": rows, "columns": options["columns"],
                 "numeric": tables.numeric_columns(rows, header), "missing": missing}
 
+    def image_folders(self, current_text: str = ""):
+        """Folders with images and the one to suggest for a pasted image (app/images.py)."""
+        return images.image_folders(self._require_project(), current_text)
+
+    def figure_names(self, folder: str, caption: str, prefix: str = "fig"):
+        """A free file name in `folder` and a free label for a new figure."""
+        return images.figure_names(self._require_project(), folder, caption, prefix)
+
+    def save_image(self, folder: str, name: str, data: str):
+        """Save a pasted image (base64 PNG); returns its project-relative path."""
+        return images.save_image(self._require_project(), folder, name, data)
+
+    def plot_latex(self, text: str, options: dict):
+        """Pasted cells as a pgfplots figure (app/plots.py) for the Plot mode of the paste dialog.
+
+        Returns {latex, csv_path, csv, comma, warnings, columns: [{name, numeric}], x, ys}.
+        """
+        rows = tables.parse_cells(text)
+        options = dict(options)
+        header = options.get("header", True)
+        defaults = plots.default_options(rows, header)
+        width = len(rows[0]) if rows else 0
+        if not isinstance(options.get("x"), int) or not 0 <= options["x"] < width:
+            options["x"] = defaults["x"]
+        if not options.get("ys"):
+            options["ys"] = [j for j in defaults["ys"] if j != options["x"]]
+        result = plots.plot_latex(self._project, rows, options)
+        return {**result, "columns": plots.columns(rows, header), "x": options["x"], "ys": options["ys"]}
+
+    def save_plot_data(self, path: str, csv: str):
+        """Write a plot's data file (data/….csv) before the figure that reads it is inserted."""
+        return plots.save_csv(self._require_project(), path, csv)
+
+    def missing_packages(self, packages: list, overrides: dict | None = None):
+        """The `packages` no .tex file of the project loads (`overrides`: unsaved buffers)."""
+        return tables.missing_packages(self._require_project(), packages, overrides)
+
     def add_packages(self, packages: list):
         """Add \\usepackage lines for the packages the project does not load yet, in the main file."""
         return tables.add_packages(self._require_project(), packages)
@@ -348,10 +405,13 @@ class Api:
     def outline(self, overrides: dict | None = None):
         """Headings of the whole document in reading order; `overrides` = unsaved buffers {path: text}.
 
-        Each heading gets `pdf: {page, y}` (PDF points from the page top) from the last build.
+        Returns {items, words}: each heading has `words` (its subsections included) and
+        `pdf: {page, y}` (PDF points from the page top) from the last build; `words` is the
+        whole document's count.
         """
         project = self._require_project()
-        items = outline.outline(project, overrides)
+        totals = {}
+        items = outline.outline(project, overrides, totals)
         pdf = project.pdf_path
         if pdf is not None:
             where = synctex.line_positions(project.root, pdf.with_suffix(".synctex.gz"))
@@ -359,7 +419,7 @@ class Api:
                 if (item["file"], item["line"]) in where:
                     page, y = where[(item["file"], item["line"])]
                     item["pdf"] = {"page": page, "y": y}
-        return items
+        return {"items": items, "words": totals["words"]}
 
     def error_report(self, problems: list):
         """The last build's errors and warnings as Markdown to paste into an AI chat (app/report.py)."""

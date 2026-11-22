@@ -177,12 +177,18 @@ def loads(text: str, package: str) -> bool:
     return re.search(rf"^[^%\n]*\\usepackage(?:\[[^\]]*\])?\{{[^}}]*\b{package}\b", text, re.M) is not None
 
 
+# Setup line written right after a package's \usepackage (pgfplots warns without compat).
+PACKAGE_SETUP = {"pgfplots": "\\pgfplotsset{compat=1.18}"}
+
+
 def insert_packages(text: str, packages: list[str]) -> str | None:
     """`text` with a \\usepackage line per package after \\documentclass; None if it has none."""
     dc = DOCUMENTCLASS_LINE.search(text)
     if not dc:
         return None
-    return text[:dc.end()] + "".join(f"\n\\usepackage{{{p}}}" for p in packages) + text[dc.end():]
+    lines = "".join(f"\n\\usepackage{{{p}}}" + (f"\n{PACKAGE_SETUP[p]}" if p in PACKAGE_SETUP else "")
+                    for p in packages)
+    return text[:dc.end()] + lines + text[dc.end():]
 
 
 def missing_packages(project: Project, packages: list[str], overrides: dict | None = None) -> list[str]:

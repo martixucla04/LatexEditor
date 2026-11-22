@@ -15,7 +15,8 @@ const container = $("pdf-container");
 const emptyState = $("pdf-empty");
 const pageIndicator = $("page-indicator");
 const zoomValue = $("zoom-value");
-const zoomButtons = ["btn-zoom-out", "btn-zoom-in", "btn-fit-width"].map($);
+// enabled only while a PDF is shown
+const zoomButtons = ["btn-zoom-out", "btn-zoom-in", "btn-fit-width", "btn-download-pdf"].map($);
 
 const eventBus = new EventBus();
 const linkService = new PDFLinkService({ eventBus, externalLinkTarget: 2 /* open in a new window */ });
@@ -193,6 +194,13 @@ function notifyView() {
 
 container.addEventListener("scroll", notifyView, { passive: true });
 eventBus.on("scalechanging", notifyView);
+
+// {pages, height}: the shown PDF's page count and its first page's height in PDF points.
+export function pdfPages() {
+  if (!pdfDoc) return null;
+  const view = viewer.getPageView(0)?.viewport?.viewBox;
+  return { pages: pdfDoc.numPages, height: view ? view[3] - view[1] : 842 };
+}
 
 // {page, y} (PDF points from the page top) of the point a quarter down the visible area
 // (the bottom of it once scrolled to the end, where the last headings never reach the top).

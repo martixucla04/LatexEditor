@@ -6,13 +6,15 @@
 
 import { call } from "./bridge.js";
 import * as editor from "./editor.js";
+import { createPlotForm } from "./plotform.js";
 import { showError, toast } from "./ui.js";
 
 const OPTIONS_KEY = "latexeditor.tableOptions";
+const MODE_KEY = "latexeditor.pasteMode"; // "table" | "plot", the mode used last
 const DEFAULTS = { env: "tabular", float: true, caption_position: "top", vlines: "none", hlines: "booktabs",
                    header: true, bold_header: true, escape: true, add_packages: true };
 
-let handlers = { saveAll: async () => true, afterChange: async () => {}, buffers: () => [] };
+let handlers = { saveAll: async () => true, afterChange: async () => {}, buffers: () => [], refreshProject: async () => {} };
 
 export function initTables(options) {
   handlers = { ...handlers, ...options };
@@ -151,8 +153,33 @@ export async function openTableDialog(text) {
   const asText = el("button", { type: "button", className: "btn", textContent: "Paste as text" });
   const cancel = el("button", { type: "button", className: "btn", textContent: "Cancel" });
   const insert = el("button", { className: "btn primary", textContent: "Insert table" });
-  const form = el("form", {}, [
-    el("h2", {}, ["Paste table ", info]),
+  const plot = createPlotForm(text, { field, box });
+  const modeButtons = ["table", "plot"].map((m) => el("button", {
+    type: "button", className: "mode-btn", textContent: m === "table" ? "Table" : "Plot", value: m,
+  }));
+  const title = el("span", { textContent: "Paste table" });
+  let mode = "table";
+  try {
+    mode = localStorage.getItem(MODE_KEY) === "plot" ? "plot" : "table";
+  } catch {
+    // table
+  }
+  const tableBody = el("div", { className: "table-body" });
+  function setMode(next) {
+    mode = next;
+    for (const b of modeButtons) b.setAttribute("aria-pressed", b.value === mode);
+    tableBody.hidden = mode !== "table";
+    plot.element.hidden = mode !== "plot";
+    title.textContent = mode === "table" ? "Paste table" : "Paste as plot";
+    insert.textContent = mode === "table" ? "Insert table" : "Insert plot";
+    try {
+      localStorage.setItem(MODE_KEY, mode);
+    } catch {
+      // not remembered
+    }
+  }
+  for (const b of modeButtons) b.addEventListener("click", () => setMode(b.value));
+  tableBody.append(
     el("div", { className: "table-options" }, [
       el("div", {}, [
         field("Environment", env),
@@ -175,12 +202,18 @@ export async function openTableDialog(text) {
     ]),
     packagesNote,
     el("div", { className: "ref-preview-box" }, [el("small", { textContent: "LaTeX" }), preview]),
+  );
+  const form = el("form", {}, [
+    el("h2", {}, [title, " ", info, el("span", { className: "spacer" }), el("span", { className: "mode-switch" }, modeButtons)]),
+    tableBody,
+    plot.element,
     el("div", { className: "modal-actions" }, [asText, el("span", { className: "spacer" }), cancel, insert]),
   ]);
   const dialog = el("dialog", { className: "modal references tables" }, [form]);
   document.body.append(dialog);
   const close = () => {
     clearTimeout(timer);
+    plot.stop();
     if (dialog.open) dialog.close();
     dialog.remove();
     editor.focusEditor();
@@ -199,6 +232,10 @@ export async function openTableDialog(text) {
     e.preventDefault();
     clearTimeout(timer);
     insert.disabled = true;
+    if (mode === "plot") {
+      insertPlot();
+      return;
+    }
     try {
       const options = current();
       saveOptions(options);
@@ -219,7 +256,31 @@ export async function openTableDialog(text) {
     }
   });
 
+  async function insertPlot() {
+    try {
+      const final = await plot.run();
+      if (final.csv_path) await call("save_plot_data", final.csv_path, final.csv);
+      close();
+      editor.insertText(final.latex);
+      const buffers = Object.fromEntries(handlers.buffers().map((b) => [b.path, b.text]));
+      const missing = await call("missing_packages", ["pgfplots"], buffers);
+      let note = final.csv_path ? ` Data saved in ${final.csv_path}.` : "";
+      if (missing.length) {
+        if (!(await handlers.saveAll())) throw new Error("Could not save the open files.");
+        const added = await call("add_packages", missing);
+        await handlers.afterChange(added.changed);
+        if (added.added.length) note += ` Added \\usepackage{pgfplots} to ${added.file}.`;
+      }
+      if (note) toast(`Plot inserted.${note}`, "success", 6000);
+      if (final.csv_path) await handlers.refreshProject();
+    } catch (err) {
+      showError(err);
+      insert.disabled = false;
+    }
+  }
+
+  setMode(mode);
   dialog.showModal();
   update();
-  env.focus();
+  (mode === "table" ? env : modeButtons[1]).focus();
 }

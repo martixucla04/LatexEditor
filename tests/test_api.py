@@ -116,3 +116,26 @@ def test_link_folder_without_tex_is_refused(settings, tmp_path):
     (tmp_path / "photos").mkdir()
     with pytest.raises(UserError, match="No .tex file"):
         Api(settings).link_folder(str(tmp_path / "photos"))
+
+
+def test_save_pdf_copies_the_build(settings, tmp_path):
+    from app.errors import UserError
+
+    folder = tmp_path / "paper"
+    folder.mkdir()
+    (folder / "main.tex").write_text(DOC, encoding="utf-8")
+    api = Api(settings)
+    api.link_folder(str(folder))
+
+    class Window:  # answers the save dialog with a path without .pdf
+        def create_file_dialog(self, *args, **kwargs):
+            return [str(tmp_path / "out" / "copy")]
+
+    api._window = Window()
+    with pytest.raises(UserError, match="Compile the document first"):
+        api.save_pdf_dialog()
+    (folder / ".build").mkdir()
+    (folder / ".build" / "main.pdf").write_bytes(b"%PDF-1.5 test")
+    (tmp_path / "out").mkdir()
+    assert api.save_pdf_dialog() == str(tmp_path / "out" / "copy.pdf")
+    assert (tmp_path / "out" / "copy.pdf").read_bytes() == b"%PDF-1.5 test"

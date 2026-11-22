@@ -5,7 +5,7 @@
 // SyncTeX positions of the last build). Clicking a heading moves both there.
 
 import { call } from "./bridge.js";
-import { onViewChange, scrollToPdfPoint, viewPosition } from "./pdfview.js";
+import { onViewChange, pdfPages, scrollToPdfPoint, viewPosition } from "./pdfview.js";
 
 const VISIBLE_KEY = "latexeditor.outlineVisible";
 
@@ -15,6 +15,8 @@ const toggleBtn = document.getElementById("btn-outline");
 
 let handlers = { onOpen() {}, buffers: () => [] };
 let items = [];
+let totalWords = 0;
+let shownPages = null; // PDF page count the counts were drawn with
 let timer = null;
 let runId = 0;
 let cursor = { file: null, line: 0 };
@@ -42,7 +44,10 @@ export function initOutline(options) {
   viewEl.hidden = !visible;
   toggleBtn.setAttribute("aria-pressed", visible);
   toggleBtn.addEventListener("click", () => setVisible(viewEl.hidden));
-  onViewChange(highlightPdf);
+  onViewChange(() => {
+    if ((pdfPages()?.pages ?? null) !== shownPages) render(); // a new PDF: new page counts
+    else highlightPdf();
+  });
   const unpin = () => {
     pinned = null;
   };
@@ -73,7 +78,8 @@ async function load() {
     const overrides = Object.fromEntries(handlers.buffers().map((b) => [b.path, b.text]));
     const result = await call("outline", overrides);
     if (id !== runId) return;
-    items = result;
+    items = result.items;
+    totalWords = result.words;
     render();
   } catch (err) {
     if (id !== runId) return;
@@ -120,9 +126,40 @@ function highlightPdf() {
   mark("in-pdf", active);
 }
 
+const shortNumber = (n) => (n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`);
+
+// Pages from each heading to the next one of the same or higher level (the last: to the
+// end of the PDF), from the headings' SyncTeX positions; null without a position.
+function pageSpans(info) {
+  return items.map((item, i) => {
+    if (!info || !item.pdf) return null;
+    // A part or chapter starts a new page: it counts from the top of its page, and the
+    // heading before it ends on the page before. Sections share pages with what precedes them.
+    const newPage = (heading) => heading.level <= 1;
+    const at = (heading) => heading.pdf.page + (newPage(heading) ? 0 : Math.min(heading.pdf.y, info.height) / info.height);
+    const next = items.slice(i + 1).find((later) => later.level <= item.level && later.pdf);
+    const end = next ? at(next) : info.pages + 1;
+    const lastPage = next ? (newPage(next) ? next.pdf.page - 1 : next.pdf.page) : info.pages;
+    return { pages: Math.max(0, end - at(item)), first: item.pdf.page, last: Math.max(item.pdf.page, lastPage) };
+  });
+}
+
+function renderTotal(info) {
+  let total = viewEl.querySelector(".outline-total");
+  if (!total) {
+    total = Object.assign(document.createElement("div"), { className: "outline-total" });
+    viewEl.append(total);
+  }
+  total.hidden = !items.length;
+  total.textContent = `${totalWords.toLocaleString()} words` + (info ? ` · ${info.pages} pages` : "");
+  total.title = "Words of the document body (no math, commands, comments or bibliography)"
+    + (info ? "; pages of the PDF" : "; compile to see pages");
+}
+
 function render(message = "No sections found. Headings appear here once the main file (or a file it \\input-s) has \\chapter, \\section…") {
   listEl.replaceChildren();
   if (!items.length) {
+    renderTotal(null);
     const p = document.createElement("p");
     p.className = "empty-state";
     p.textContent = message;
@@ -130,12 +167,23 @@ function render(message = "No sections found. Headings appear here once the main
     return;
   }
   const top = Math.min(...items.map((i) => i.level));
-  for (const item of items) {
+  const info = pdfPages();
+  shownPages = info?.pages ?? null;
+  const spans = pageSpans(info);
+  items.forEach((item, index) => {
+    const span = spans[index];
     const button = document.createElement("button");
     button.className = `outline-item level-${item.level}`;
     button.style.paddingLeft = `${8 + (item.level - top) * 12}px`;
-    button.textContent = item.title;
-    button.title = `${item.title}\n${item.file}:${item.line}${item.pdf ? `\nPDF page ${item.pdf.page}` : "\nNot in the PDF yet (compile)"}`;
+    const pages = span ? (span.pages < 1 ? "<1 p" : `${Math.round(span.pages)} p`) : "";
+    button.append(
+      Object.assign(document.createElement("span"), { className: "outline-title", textContent: item.title }),
+      Object.assign(document.createElement("span"), {
+        className: "outline-count", textContent: `${shortNumber(item.words)} w${pages ? ` · ${pages}` : ""}`,
+      }),
+    );
+    button.title = `${item.title}\n${item.file}:${item.line}\n${item.words.toLocaleString()} words`
+      + (span ? `\nPages ${span.first}–${span.last} (≈ ${span.pages.toFixed(1)})` : "\nNot in the PDF yet (compile)");
     button.addEventListener("click", () => {
       handlers.onOpen(item.file, item.line);
       if (item.pdf) {
@@ -145,7 +193,8 @@ function render(message = "No sections found. Headings appear here once the main
       }
     });
     listEl.append(button);
-  }
+  });
+  renderTotal(info);
   highlightCode();
   highlightPdf();
 }

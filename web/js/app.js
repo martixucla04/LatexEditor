@@ -13,6 +13,7 @@ import { clearOutline, initOutline, refreshOutline, setOutlineCursor } from "./o
 import { initFormatBar } from "./format.js";
 import { initReferences, openReferenceDialog } from "./references.js";
 import { initTables, openTableDialog } from "./tables.js";
+import { initImages, openImageDialog } from "./images.js";
 import { loadPreferences, openSettings } from "./settings.js";
 import { setSpellProject } from "./spell.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
@@ -470,6 +471,16 @@ async function updateErrorReport(problems) {
   $("btn-copy-report").disabled = !text;
 }
 
+async function downloadPdf() {
+  if (!project) return;
+  try {
+    const path = await call("save_pdf_dialog");
+    if (path) toast(`PDF saved to ${path}`, "success");
+  } catch (err) {
+    showError(err);
+  }
+}
+
 async function copyErrorReport() {
   const text = $("report-text").textContent;
   if (!text) return;
@@ -742,6 +753,7 @@ function initToolbar() {
   $("btn-save").addEventListener("click", saveAll);
   $("btn-compile").addEventListener("click", onCompileButton);
   $("btn-copy-report").addEventListener("click", copyErrorReport);
+  $("btn-download-pdf").addEventListener("click", downloadPdf);
   $("engine-select").addEventListener("change", changeEngine);
   $("btn-sync").addEventListener("click", forwardSearch);
   $("btn-settings").addEventListener("click", openSettings);
@@ -804,6 +816,12 @@ function initShortcuts() {
       event.preventDefault();
       event.stopPropagation();
       compile();
+      return;
+    }
+    if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyE") {
+      event.preventDefault();
+      event.stopPropagation();
+      downloadPdf();
       return;
     }
     if (event.ctrlKey && event.shiftKey && !event.altKey && event.code === "KeyO") {
@@ -917,6 +935,15 @@ async function main() {
   });
   initTables({
     saveAll,
+    refreshProject,
+    buffers: () => editor.dirtyFiles().filter((f) => f.path.endsWith(".tex")),
+    afterChange: async (files) => {
+      for (const file of files.filter(editor.isOpen)) editor.reloadFile(file, await call("read_file", file));
+    },
+  });
+  initImages({
+    saveAll,
+    refreshProject,
     buffers: () => editor.dirtyFiles().filter((f) => f.path.endsWith(".tex")),
     afterChange: async (files) => {
       for (const file of files.filter(editor.isOpen)) editor.reloadFile(file, await call("read_file", file));
@@ -932,6 +959,7 @@ async function main() {
     },
     onActiveChange: (path) => tree.setActive(path),
     onPasteTable: (text) => openTableDialog(text),
+    onPasteImage: (file) => openImageDialog(file),
     onCursor: (pos) => {
       $("status-cursor").textContent = pos ? `Ln ${pos.lineNumber}, Col ${pos.column}` : "";
       setOutlineCursor(editor.getActivePath(), pos?.lineNumber ?? 0);

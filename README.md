@@ -23,6 +23,22 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
   above `\bibliography`/`\printbibliography` for `.bib` entries). With BibTeX (`\bibliography{…}`, e.g. IEEEtran) or biblatex
   (`\addbibresource{…}`) it becomes an `@misc` entry in that `.bib` file; otherwise a `\bibitem` in
   the document's `thebibliography` (created if missing)
+- **Paste images as figures**: pasting a screenshot (an image with no text on the clipboard) into a
+  `.tex` file opens a dialog to crop it (drag on the preview), trim its empty margin, make a plain
+  background white or transparent (tolerance slider), and set the caption, an optional source
+  ("(Font: …)"), label, width (0.3–1 × `\textwidth`, shown on a page outline), folder (the one the
+  current file's figures use) and file name. It saves a PNG and inserts a `figure` with `[ht]`,
+  `\centering`, `\includegraphics`, `\caption` and `\label`; `graphicx` is added if missing
+- **Excel data as a plot**: the paste-table dialog has a **Table | Plot** switch (it remembers the
+  last one). Plot writes a `pgfplots` chart: line, line with markers, scatter or bar; X column and
+  Y series; axis labels; legend; grid; width/height; decimal commas (`3,65`) read from the data and
+  shown on the axes. A quick drawing previews it. Up to 60 rows the data goes in the figure; longer
+  series are saved as `data/<label>.csv`. `\usepackage{pgfplots}` and `\pgfplotsset{compat=1.18}`
+  are added if missing
+- **Word and page counts** in the outline: every heading shows its words and pages (subsections
+  included; e.g. `3.4k w · 12 p`), with the document total at the bottom. Words skip math, commands,
+  labels/references/citations, comments and the bibliography; pages come from the last compile
+- **Download PDF** (button in the PDF toolbar, Ctrl+Shift+E): save a copy of the compiled PDF anywhere
 - **Paste tables from Excel**: pasting copied cells into a `.tex` file opens a dialog to choose
   `tabular`, `tabularx` (full width) or `longtable` (breaks across pages, header repeated), each
   column's alignment (left, centre, right, wrapped `p`, filling `X`; numbers default to right),

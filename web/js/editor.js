@@ -28,7 +28,7 @@ let activePath = null;
 let modelCounter = 0;
 const tabs = new Map(); // path -> { path, kind, model, viewState, encoding, savedVersion, data }
 let problemsByPath = new Map(); // path -> build problems located in that file
-let handlers = { onDirtyChange() {}, onActiveChange() {}, onCursor() {}, onEdit() {}, onPasteTable: null };
+let handlers = { onDirtyChange() {}, onActiveChange() {}, onCursor() {}, onEdit() {}, onPasteTable: null, onPasteImage: null };
 let lastDirty = false;
 
 const extOf = (path) => (path.includes(".") ? path.split(".").pop().toLowerCase() : "");
@@ -153,14 +153,25 @@ export async function initEditor(options) {
   });
   initMathPreview(monaco, editor);
   // Cells copied from Excel (or another spreadsheet) open the paste-table dialog instead.
+  // An image with no text (a screenshot, "Copy image") opens the paste-image dialog; Word and
+  // Excel also put a picture next to copied text, so any text means a normal or table paste.
   editorEl.addEventListener("paste", (e) => {
     const tab = tabs.get(activePath);
-    if (!handlers.onPasteTable || tab?.model?.getLanguageId() !== "latex") return;
-    const text = e.clipboardData?.getData("text/plain") ?? "";
-    if (!looksLikeTable(text, e.clipboardData.getData("text/html"))) return;
-    e.preventDefault();
-    e.stopPropagation();
-    handlers.onPasteTable(text);
+    if (tab?.model?.getLanguageId() !== "latex" || !e.clipboardData) return;
+    const text = e.clipboardData.getData("text/plain") ?? "";
+    const image = [...e.clipboardData.files].find((f) => f.type.startsWith("image/"));
+    let handled = false;
+    if (handlers.onPasteTable && looksLikeTable(text, e.clipboardData.getData("text/html"))) {
+      handlers.onPasteTable(text);
+      handled = true;
+    } else if (handlers.onPasteImage && image && !text.trim()) {
+      handlers.onPasteImage(image);
+      handled = true;
+    }
+    if (handled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
   }, true);
   // The themed DOM only exists once a file is shown, so share the colours then too.
   editor.onDidChangeModel(shareThemeVariables);
@@ -578,6 +589,16 @@ export function reloadFile(path, data) {
 }
 
 // Cursor of the active text file: { path, line, column } or null.
+// Text of the active file before and after the cursor (empty strings without a text tab).
+export function textAroundCursor() {
+  const tab = tabs.get(activePath);
+  if (tab?.kind !== "text") return { before: "", after: "" };
+  const model = tab.model;
+  const offset = model.getOffsetAt(editor.getPosition());
+  const text = model.getValue();
+  return { before: text.slice(0, offset), after: text.slice(offset) };
+}
+
 export function cursor() {
   const tab = tabs.get(activePath);
   if (tab?.kind !== "text") return null;

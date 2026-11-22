@@ -139,6 +139,7 @@
           <dl class="shortcuts">
             <dt><kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>Save all files</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></dt><dd>Save all files and compile</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></dt><dd>Download (save a copy of) the PDF</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd></dt><dd>Bold / italic / underline (toolbar above the editor)</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>M</kbd></dt><dd>Inline math $…$</dd>
             <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></dt><dd>Add a reference ([1] button)</dd>
@@ -201,6 +202,10 @@
         <button class="tb-btn small sync-btn" id="btn-sync" disabled title="Show the cursor's line in the PDF (Ctrl+Alt+J). Double-click the PDF to jump back to the source.">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
           <span>Find in PDF</span>
+        </button>
+        <button class="tb-btn small" id="btn-download-pdf" disabled title="Save a copy of the PDF (Ctrl+Shift+E)">
+          <svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          <span>Download PDF</span>
         </button>
         <div class="spacer"></div>
         <span class="page-indicator" id="page-indicator">– / –</span>
