@@ -260,6 +260,7 @@ async function showEngine(name) {
 
 async function changeEngine() {
   const name = $("engine-select").value;
+  editor.focusEditor(); // back to the text once a compiler is picked
   try {
     project = await call("set_engine", name);
     showEngine(project.engine);
@@ -866,6 +867,14 @@ function initShortcuts() {
     event.preventDefault();
     event.stopPropagation();
     action();
+  }, true);
+
+  // Toolbar buttons, panel tabs and outline headings never take the keyboard focus (like the
+  // format bar's), so Ctrl+C/V/Z keep acting on the editor after Compile, Find in PDF…
+  document.addEventListener("mousedown", (e) => {
+    if (e.button === 0 && e.target.closest(".tb-btn, .panel-tab, .outline-item") && !e.target.closest("dialog")) {
+      e.preventDefault();
+    }
   }, true);
 
   // The browser's own context menu (Reload, Inspect…) is not useful here.

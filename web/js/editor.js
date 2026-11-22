@@ -141,6 +141,9 @@ export async function initEditor(options) {
     quickSuggestions: { other: true, comments: false, strings: false },
     snippetSuggestions: "inline",
     dropIntoEditor: { enabled: false }, // dropped files are imported/added, not pasted as text
+    // Monaco 0.57 types through Chromium's new EditContext by default; the long-tested hidden
+    // textarea is safer for copy/paste/undo inside WebView2.
+    editContext: false,
   });
   editor.onDidChangeCursorPosition((e) => {
     handlers.onCursor(e.position);

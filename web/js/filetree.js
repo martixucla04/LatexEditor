@@ -25,7 +25,8 @@ function iconFor(node) {
 
 export class FileTree {
   // onOpen(path, { focus }), onContextMenu(node | null, x, y), onKey(node, key)
-  // A click opens a file but keeps focus here (so F2/Del still work); Enter moves focus to the editor.
+  // A click on a file opens it with the focus in the editor; a click on a folder keeps focus
+  // here (F2/Del, arrows); Enter on a file also moves the focus to the editor.
   constructor(container, handlers) {
     this.container = container;
     this.handlers = handlers;
@@ -135,9 +136,13 @@ export class FileTree {
 
       row.addEventListener("click", () => {
         this.select(node.path);
-        row.focus();
-        if (isDir) this.toggle(node.path);
-        else this.handlers.onOpen(node.path, { focus: false });
+        // a file: the cursor goes to the editor, so Ctrl+C/V/Z act on the text right away
+        if (isDir) {
+          row.focus();
+          this.toggle(node.path);
+        } else {
+          this.handlers.onOpen(node.path, { focus: true });
+        }
       });
 
       li.append(row);

@@ -58,6 +58,7 @@ class Api:
         self._window = None
         self._engine = None
         self._engines: dict[str, dict | None] = {}  # detect_engine() per engine name
+        self._refocus_attached = False
         self._settings = settings or Settings()
         self._project: Project | None = None
         self._dirty = False
@@ -77,6 +78,23 @@ class Api:
         from webview.dom import DOMEventHandler
 
         self._window.dom.document.events.drop += DOMEventHandler(self._on_drop, prevent_default=True)
+        self._refocus_page_on_activate()
+
+    def _refocus_page_on_activate(self):
+        """Back in the window (Alt+Tab, after a file dialog or message box), give the keyboard to
+        the page: pywebview only focuses the WebView2 control when the window first shows, so
+        otherwise keys (Ctrl+C/V/Z, typing) can go to the window frame until the user clicks."""
+        if self._refocus_attached:
+            return
+        form = getattr(self._window, "native", None)
+        control = getattr(getattr(form, "browser", None), "webview", None)
+        if form is None or control is None or not hasattr(form, "Activated"):
+            return  # not the Windows WebView2 backend
+        try:
+            form.Activated += lambda *_: control.Focus()  # runs on the UI thread
+            self._refocus_attached = True
+        except Exception:  # never let this break the window
+            pass
 
     def _on_drop(self, event):
         files = (event.get("dataTransfer") or {}).get("files") or []
