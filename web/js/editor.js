@@ -28,7 +28,7 @@ let activePath = null;
 let modelCounter = 0;
 const tabs = new Map(); // path -> { path, kind, model, viewState, encoding, savedVersion, data }
 let problemsByPath = new Map(); // path -> build problems located in that file
-let handlers = { onDirtyChange() {}, onActiveChange() {}, onCursor() {}, onEdit() {} };
+let handlers = { onDirtyChange() {}, onActiveChange() {}, onCursor() {}, onEdit() {}, onPasteTable: null };
 let lastDirty = false;
 
 const extOf = (path) => (path.includes(".") ? path.split(".").pop().toLowerCase() : "");
@@ -75,6 +75,16 @@ function shareThemeVariables() {
     }
     if (copied) sharedTheme = theme; // none yet = no file shown yet; retry on the next model
   });
+}
+
+// Spreadsheets put an HTML <table> next to the tab-separated text; without it, every line
+// must have the same number of tabs (and not only indentation).
+function looksLikeTable(text, html) {
+  if (!text.includes("\t")) return false;
+  if (/<table[\s>]/i.test(html || "")) return true;
+  const lines = text.replace(/\r?\n$/, "").split(/\r?\n/);
+  const tabsIn = (line) => line.replace(/^\t+/, "").split("\t").length - 1;
+  return lines.length > 1 && tabsIn(lines[0]) > 0 && lines.every((l) => tabsIn(l) === tabsIn(lines[0]));
 }
 
 export async function initEditor(options) {
@@ -142,6 +152,16 @@ export async function initEditor(options) {
     }
   });
   initMathPreview(monaco, editor);
+  // Cells copied from Excel (or another spreadsheet) open the paste-table dialog instead.
+  editorEl.addEventListener("paste", (e) => {
+    const tab = tabs.get(activePath);
+    if (!handlers.onPasteTable || tab?.model?.getLanguageId() !== "latex") return;
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    if (!looksLikeTable(text, e.clipboardData.getData("text/html"))) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handlers.onPasteTable(text);
+  }, true);
   // The themed DOM only exists once a file is shown, so share the colours then too.
   editor.onDidChangeModel(shareThemeVariables);
   shareThemeVariables();

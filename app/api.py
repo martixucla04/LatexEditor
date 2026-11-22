@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from . import __version__, outline, references, reftypes, search, synctex
+from . import __version__, outline, references, reftypes, search, synctex, tables
 from .builder import Builder, BuildResult
 from .completions import scan_project
 from .errors import UserError
@@ -300,6 +300,27 @@ class Api:
     def add_reference(self, kind: str, fields: dict):
         """Add a reference to the bibliography (see app/references.py)."""
         return references.add_reference(self._require_project(), kind, fields)
+
+    def table_latex(self, text: str, options: dict, overrides: dict | None = None):
+        """Pasted spreadsheet cells as LaTeX (app/tables.py) for the paste-table dialog.
+
+        Returns {latex, rows, columns (the column types used), numeric, missing (packages
+        no .tex file loads; `overrides` = unsaved buffers {path: text})}.
+        """
+        rows = tables.parse_cells(text)
+        options = dict(options)
+        header = options.get("header", True)
+        if not options.get("columns") or len(options["columns"]) != (len(rows[0]) if rows else 0):
+            options["columns"] = tables.default_columns(rows, options.get("env", "tabular"), header)
+        missing = []
+        if self._project is not None:
+            missing = tables.missing_packages(self._project, tables.needed_packages(options), overrides)
+        return {"latex": tables.to_latex(rows, options), "rows": rows, "columns": options["columns"],
+                "numeric": tables.numeric_columns(rows, header), "missing": missing}
+
+    def add_packages(self, packages: list):
+        """Add \\usepackage lines for the packages the project does not load yet, in the main file."""
+        return tables.add_packages(self._require_project(), packages)
 
     def spell_settings(self):
         """{language: "en"|"ca"|"es"|"off", words: [project dictionary]}"""

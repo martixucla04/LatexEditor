@@ -23,6 +23,14 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
   above `\bibliography`/`\printbibliography` for `.bib` entries). With BibTeX (`\bibliography{…}`, e.g. IEEEtran) or biblatex
   (`\addbibresource{…}`) it becomes an `@misc` entry in that `.bib` file; otherwise a `\bibitem` in
   the document's `thebibliography` (created if missing)
+- **Paste tables from Excel**: pasting copied cells into a `.tex` file opens a dialog to choose
+  `tabular`, `tabularx` (full width) or `longtable` (breaks across pages, header repeated), each
+  column's alignment (left, centre, right, wrapped `p`, filling `X`; numbers default to right),
+  vertical lines (none, outer, between columns, all), horizontal lines (booktabs, frame, every
+  row, under the header, none), header row in bold, escaping of `& % $ # _`…, and a floating
+  `table` with caption and label. A live preview shows the LaTeX; missing `\usepackage` lines
+  (tabularx, longtable, booktabs) can be added to the preamble. "Paste as text" pastes the
+  cells as they are. The options are remembered
 - LuaLaTeX builds with biber/BibTeX, glossaries and index run automatically when needed;
   unchanged projects are not rebuilt and a `.bib`-only change skips the first LaTeX run
 - PDF preview that keeps its zoom and position; SyncTeX (Ctrl+Alt+J ↔ double-click in the PDF)

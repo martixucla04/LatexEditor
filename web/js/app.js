@@ -12,6 +12,7 @@ import { initSearch, setSearchProject, showSearch, showSidebarView } from "./sea
 import { clearOutline, initOutline, refreshOutline, setOutlineCursor } from "./outline.js";
 import { initFormatBar } from "./format.js";
 import { initReferences, openReferenceDialog } from "./references.js";
+import { initTables, openTableDialog } from "./tables.js";
 import { loadPreferences, openSettings } from "./settings.js";
 import { setSpellProject } from "./spell.js";
 import { chooseDialog, confirmDialog, contextMenu, promptDialog, showError, toast } from "./ui.js";
@@ -802,6 +803,13 @@ async function main() {
       refreshCompletionData();
     },
   });
+  initTables({
+    saveAll,
+    buffers: () => editor.dirtyFiles().filter((f) => f.path.endsWith(".tex")),
+    afterChange: async (files) => {
+      for (const file of files.filter(editor.isOpen)) editor.reloadFile(file, await call("read_file", file));
+    },
+  });
   initToolbar();
   initShortcuts();
   setProjectUi(null);
@@ -811,6 +819,7 @@ async function main() {
       call("set_dirty", dirty).catch(() => {});
     },
     onActiveChange: (path) => tree.setActive(path),
+    onPasteTable: (text) => openTableDialog(text),
     onCursor: (pos) => {
       $("status-cursor").textContent = pos ? `Ln ${pos.lineNumber}, Col ${pos.column}` : "";
       setOutlineCursor(editor.getActivePath(), pos?.lineNumber ?? 0);

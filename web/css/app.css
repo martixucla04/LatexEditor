@@ -1180,3 +1180,40 @@ kbd {
 .math-preview[hidden] { display: none; }
 .math-preview mjx-container { margin: 0 !important; }
 .math-preview.error { color: var(--danger); font: 12px var(--font-mono); }
+
+/* Paste table dialog */
+.modal.tables { width: min(820px, calc(100vw - 32px)); }
+.modal.tables form { overflow: auto; }
+.modal.tables h2 { display: flex; align-items: baseline; gap: 10px; }
+.table-info { color: var(--text-muted); font-size: 12px; font-weight: 400; }
+.table-options { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+.modal.tables label.ref-field { grid-template-columns: 130px 1fr; }
+.modal.tables select,
+.modal.tables .ref-field input[type="text"] {
+  min-width: 0;
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.modal.tables :disabled { opacity: 0.5; }
+.table-columns-row { margin: 6px 0 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.table-columns-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: var(--text); }
+.table-columns { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.modal label.table-column { flex: 0 0 104px; gap: 4px; }
+.table-column span { overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.modal label.table-packages { padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); }
+.table-preview {
+  max-height: 220px;
+  margin: 4px 0 0;
+  overflow: auto;
+  color: var(--text);
+  font: 12px/1.45 var(--font-mono);
+  white-space: pre;
+}
+@media (max-width: 640px) { .table-options { grid-template-columns: 1fr; } }
+.modal.tables label.ref-field.checkbox { grid-template-columns: 16px 1fr; gap: 10px; }
+.modal.tables label.ref-field.checkbox input { order: -1; }
