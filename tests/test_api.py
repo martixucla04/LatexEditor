@@ -88,6 +88,28 @@ def test_link_folder_edits_in_place_and_is_marked_linked(settings, tmp_path, mak
     assert linked == {"paper": False, "thesis": True}
 
 
+def test_save_does_not_overwrite_a_change_made_by_another_program(settings, tmp_path):
+    import os
+
+    folder = tmp_path / "thesis"
+    folder.mkdir()
+    main = folder / "main.tex"
+    main.write_text(DOC, encoding="utf-8")
+    api = Api(settings)
+    api.link_folder(str(folder))
+    opened = api.read_file("main.tex")["mtime"]
+
+    saved = api.save_file("main.tex", DOC + "% mine 1\n", "utf-8", opened)
+    assert saved["mtime"] != opened and "conflict" not in saved
+
+    main.write_text(DOC + "% from git\n", encoding="utf-8")  # e.g. git pull meanwhile
+    os.utime(main, ns=(int(saved["mtime"]) + 10**9,) * 2)  # coarse file-system clocks
+    assert api.save_file("main.tex", DOC + "% mine 2\n", "utf-8", saved["mtime"]) == {"conflict": True}
+    assert main.read_text(encoding="utf-8").endswith("% from git\n")
+    assert "conflict" not in api.save_file("main.tex", DOC + "% mine 2\n")  # "Keep my version"
+    assert main.read_text(encoding="utf-8").endswith("% mine 2\n")
+
+
 def test_link_folder_without_tex_is_refused(settings, tmp_path):
     from app.errors import UserError
 

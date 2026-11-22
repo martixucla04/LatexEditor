@@ -63,6 +63,14 @@ def test_replace_regex_groups_and_file_filter(project):
     assert "\\section*{Intro}\\sectionmark{x}" in (project.root / "main.tex").read_text()
 
 
+def test_regex_replacement_keeps_latex_backslashes(project):
+    # \t and \s are LaTeX here, not a tab or an error; \1 and ${2} are groups
+    replace(project, r"(The) (Panel)", r"\textbf{$1} \section{\1}\emph{${2}}", regex=True, case=True)
+    assert "\\textbf{The} \\section{The}\\emph{Panel} and" in (project.root / "main.tex").read_text()
+    with pytest.raises(UserError, match="no group 3"):
+        replace(project, r"(panel)", r"$3", regex=True)
+
+
 def test_replace_text_with_backslashes_literally(project):
     replace(project, "\\input{ch/one}", "\\include{ch/one}")
     assert "\\include{ch/one}" in (project.root / "main.tex").read_text()

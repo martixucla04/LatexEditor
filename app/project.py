@@ -210,7 +210,14 @@ class Project:
         if b"\x00" in data[:8192]:
             return {"kind": "binary", "size": size}
         text, encoding = _decode(data)
-        return {"kind": "text", "text": text, "encoding": encoding, "size": size}
+        return {"kind": "text", "text": text, "encoding": encoding, "size": size, "mtime": self.mtime(rel)}
+
+    def mtime(self, rel: str) -> str | None:
+        """Modification time in ns as a string (too big for a JS number); None if missing."""
+        try:
+            return str(self.path(rel).stat().st_mtime_ns)
+        except OSError:
+            return None
 
     def write_file(self, rel: str, text: str, encoding: str = "utf-8") -> str:
         """Save text; returns the encoding used (falls back to UTF-8 if needed)."""

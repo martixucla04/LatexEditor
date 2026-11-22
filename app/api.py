@@ -230,8 +230,15 @@ class Api:
     def read_file(self, rel: str):
         return self._require_project().read_file(rel)
 
-    def save_file(self, rel: str, text: str, encoding: str = "utf-8"):
-        return self._require_project().write_file(rel, text, encoding)
+    def save_file(self, rel: str, text: str, encoding: str = "utf-8", expected_mtime: str | None = None):
+        """Save an editor tab. Returns {encoding, mtime}, or {conflict: True} without saving when
+        another program changed the file since the tab read it (`expected_mtime` from read_file)."""
+        project = self._require_project()
+        current = project.mtime(rel)
+        if expected_mtime and current and current != expected_mtime:
+            return {"conflict": True}
+        encoding = project.write_file(rel, text, encoding)
+        return {"encoding": encoding, "mtime": project.mtime(rel)}
 
     def create_file(self, parent_rel: str, name: str):
         return self._require_project().create_file(parent_rel, name)

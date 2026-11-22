@@ -56,7 +56,8 @@ def test_read_text_encodings(make_project):
         "latin.tex": "Catal\xe0".encode("cp1252"),
     })
     p = Project(root)
-    assert p.read_file("utf8.tex") | {"size": 0} == {"kind": "text", "text": "Català àéí", "encoding": "utf-8", "size": 0}
+    assert p.read_file("utf8.tex") | {"size": 0, "mtime": ""} == {
+        "kind": "text", "text": "Català àéí", "encoding": "utf-8", "size": 0, "mtime": ""}
     assert p.read_file("bom.tex")["encoding"] == "utf-8-sig"
     latin = p.read_file("latin.tex")
     assert (latin["text"], latin["encoding"]) == ("Català", "cp1252")

@@ -205,7 +205,7 @@ function notifyDirty() {
 // focus: move keyboard focus to the editor (false keeps it in the file tree).
 export function openTab(path, data, { focus = true } = {}) {
   if (!tabs.has(path)) {
-    const tab = { path, kind: data.kind, data, encoding: data.encoding, viewState: null };
+    const tab = { path, kind: data.kind, data, encoding: data.encoding, mtime: data.mtime, viewState: null };
     if (data.kind === "text") {
       const language = LANGUAGE_BY_EXT[extOf(path)] || "plaintext";
       const uri = monaco.Uri.parse(`inmemory://tab/${++modelCounter}/${encodeURIComponent(nameOf(path))}`);
@@ -376,16 +376,18 @@ export function dirtyFiles() {
     path: tab.path,
     text: tab.model.getValue(),
     encoding: tab.encoding,
+    mtime: tab.mtime, // when this text was read from disk, to notice changes by other programs
     version: tab.model.getAlternativeVersionId(),
   }));
 }
 
 // Record a successful save of the content as it was at `version`.
-export function markSaved(path, version, encoding) {
+export function markSaved(path, version, encoding, mtime) {
   const tab = tabs.get(path);
   if (!tab) return;
   tab.savedVersion = version;
   if (encoding) tab.encoding = encoding;
+  if (mtime) tab.mtime = mtime;
   renderTabs();
   notifyDirty();
 }
@@ -544,10 +546,17 @@ export function selectRange(line, column, length) {
 export function reloadFile(path, data) {
   const tab = tabs.get(path);
   if (!tab?.model || data.kind !== "text") return;
+  tab.mtime = data.mtime;
   const model = tab.model;
   const oldText = model.getValue();
   const newText = data.text.replace(/\r\n/g, model.getEOL());
-  if (oldText === newText) return;
+  if (oldText === newText) {
+    // same text as on disk: nothing to change, but it is no longer unsaved
+    tab.savedVersion = model.getAlternativeVersionId();
+    renderTabs();
+    notifyDirty();
+    return;
+  }
   let prefix = 0;
   const max = Math.min(oldText.length, newText.length);
   while (prefix < max && oldText[prefix] === newText[prefix]) prefix++;

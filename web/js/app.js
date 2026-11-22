@@ -344,8 +344,30 @@ async function saveAll() {
   if (!files.length) return true;
   for (const file of files) {
     try {
-      const encoding = await call("save_file", file.path, file.text, file.encoding);
-      editor.markSaved(file.path, file.version, encoding);
+      let saved = await call("save_file", file.path, file.text, file.encoding, file.mtime);
+      if (saved.conflict) {
+        // Another program (git, another editor…) changed the file since it was opened here.
+        const choice = await chooseDialog({
+          title: "File changed on disk",
+          message: `${file.path} was changed by another program after it was opened here.`,
+          options: [
+            { value: "disk", label: "Use the version on disk", detail: "Your unsaved edits to this file are replaced (Ctrl+Z brings them back)" },
+            { value: "mine", label: "Keep my version", detail: "Overwrite the file on disk with the text in the editor" },
+          ],
+          okLabel: "Continue",
+        });
+        if (!choice) {
+          setStatus(`${basename(file.path)} not saved`, "warning");
+          return false;
+        }
+        if (choice === "disk") {
+          editor.reloadFile(file.path, await call("read_file", file.path));
+          continue;
+        }
+        saved = await call("save_file", file.path, file.text, file.encoding);
+      }
+      const { encoding } = saved;
+      editor.markSaved(file.path, file.version, encoding, saved.mtime);
       if (file.encoding && encoding !== file.encoding) {
         toast(`${basename(file.path)} contained characters its old encoding can't store, so it was saved as UTF-8.`, "warning", 8000);
       }

@@ -36,12 +36,27 @@ def compile_query(query: str, regex: bool = False, case: bool = False, word: boo
         raise UserError(f"Invalid regular expression: {exc}") from exc
 
 
+GROUP_REF = re.compile(r"\\\\|\\(\d)|\$(\d+)|\$\{(\d+)\}")
+
+
 def _replacement(replacement: str, regex: bool):
-    """Value for Pattern.sub: literal text, or a template with $1/\\1 groups in regex mode."""
+    """Value for Pattern.sub: literal text, or in regex mode $1, ${1} and \\1 replaced by the
+    groups and \\\\ by one backslash. Other backslashes stay as typed, so \\textbf{$1} works
+    (Python's own template syntax would turn \\t into a tab)."""
     if not regex:
         return lambda _m: replacement
-    template = re.sub(r"\$(\d+)|\$\{(\d+)\}", lambda m: f"\\g<{m.group(1) or m.group(2)}>", replacement)
-    return template
+
+    def expand(m: re.Match) -> str:
+        def group(ref: re.Match) -> str:
+            if ref.group(0) == "\\\\":
+                return "\\"
+            n = int(ref.group(1) or ref.group(2) or ref.group(3))
+            if n > (m.re.groups or 0):
+                raise UserError(f"Invalid replacement: there is no group {n}.")
+            return m.group(n) or ""
+        return GROUP_REF.sub(group, replacement)
+
+    return expand
 
 
 def _included(rel: str, include: str) -> bool:
