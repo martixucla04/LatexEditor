@@ -8,6 +8,8 @@ const MIN_EDITOR_W = 320;
 const MIN_SIDEBAR_W = 200; // room for the Files/Search tabs and the three file buttons
 const MAX_SIDEBAR_W = 480;
 const MIN_EDITOR_H = 200;
+const MIN_OUTLINE_W = 120;
+const MAX_OUTLINE_W = 480;
 const KEY_STEP = 16;
 
 const workbench = document.getElementById("workbench");
@@ -18,6 +20,7 @@ const state = {
   sidebar: 240,
   pdfRatio: DEFAULT_PDF_RATIO,
   panel: 180,
+  outline: 210,
   sidebarVisible: true,
   panelVisible: true,
 };
@@ -51,7 +54,9 @@ function measure() {
   const pdf = clamp(Math.round(width * state.pdfRatio), 280, pdfMax);
   const tabsH = document.getElementById("tabs").offsetHeight;
   const panel = clamp(state.panel, 80, Math.max(80, column.clientHeight - tabsH - MIN_EDITOR_H));
-  return { width, sidebar, pdf, panel };
+  // the outline lives inside the PDF pane: leave the PDF at least 160px
+  const outline = clamp(state.outline, MIN_OUTLINE_W, Math.max(MIN_OUTLINE_W, Math.min(MAX_OUTLINE_W, pdf - 160)));
+  return { width, sidebar, pdf, panel, outline };
 }
 
 function apply() {
@@ -59,6 +64,7 @@ function apply() {
   root.style.setProperty("--sidebar-w", `${size.sidebar}px`);
   root.style.setProperty("--pdf-w", `${size.pdf}px`);
   root.style.setProperty("--panel-h", `${size.panel}px`);
+  root.style.setProperty("--outline-w", `${size.outline}px`);
   workbench.classList.toggle("sidebar-hidden", !state.sidebarVisible);
   column.classList.toggle("panel-hidden", !state.panelVisible);
   document.getElementById("btn-toggle-sidebar").setAttribute("aria-pressed", state.sidebarVisible);
@@ -70,6 +76,7 @@ const panes = {
   sidebar: { get: () => measure().sidebar, set: (px) => { state.sidebar = px; } },
   pdf: { get: () => measure().pdf, set: (px) => { state.pdfRatio = px / workbench.clientWidth; } },
   panel: { get: () => measure().panel, set: (px) => { state.panel = px; } },
+  outline: { get: () => measure().outline, set: (px) => { state.outline = px; } },
 };
 
 function resize(pane, px) {
@@ -158,6 +165,7 @@ export function initLayout() {
   makeSplitter(document.getElementById("split-sidebar"), "sidebar", "x", 1);
   makeSplitter(document.getElementById("split-pdf"), "pdf", "x", -1);
   makeSplitter(document.getElementById("split-panel"), "panel", "y", -1);
+  makeSplitter(document.getElementById("split-outline"), "outline", "x", -1);
 
   // Double-click the PDF splitter to go back to the default split.
   document.getElementById("split-pdf").addEventListener("dblclick", () => {
