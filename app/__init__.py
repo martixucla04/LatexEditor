@@ -1,3 +1,3 @@
-"""LaTeX Editor: desktop editor for LuaLaTeX projects."""
+"""LaTeX Editor: desktop editor for LaTeX projects."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
