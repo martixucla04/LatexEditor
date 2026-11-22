@@ -84,3 +84,82 @@ def inverse(root: Path, pdf_rel: str, page: int, x: float, y: float) -> dict | N
         if file and line > 0:
             return {"file": file, "line": line}
     return None
+
+
+# -- every source line at once (for the outline), read straight from .synctex.gz --
+
+# A line box, glue, kern or math record: type, input tag, line[, column]: h, v[: W, H, D].
+# Vertical boxes ([, v) are left out: a tall one's top can be far above the line.
+RECORD = re.compile(r"^[\(hxkg$](\d+),(\d+)(?:,-?\d+)?:(-?\d+),(-?\d+)(?::(-?\d+),(-?\d+))?")
+SP_TO_BP = 72 / 72.27 / 65536  # TeX scaled points -> PDF points
+HEADER_BAND_BP = 50  # running heads sit above this; headings in the text never do
+_line_cache: dict[str, tuple[float, dict]] = {}
+
+
+def line_positions(root: Path, synctex_path: Path) -> dict[tuple[str, int], tuple[int, float]]:
+    """{(project file, line): (page, y)} for every source line that produced output.
+
+    y is the top of the line's highest box in PDF points from the top of the page. A line
+    with output on several pages counts on the last one (see below). Cached until the
+    .synctex.gz changes.
+    """
+    import gzip
+
+    key = str(synctex_path)
+    try:
+        mtime = synctex_path.stat().st_mtime
+    except OSError:
+        return {}
+    if key in _line_cache and _line_cache[key][0] == mtime:
+        return _line_cache[key][1]
+
+    inputs: dict[str, str | None] = {}
+    # (file, line) -> {page: [records below the header band, their min y, all records, min y]}
+    seen: dict[tuple[str, int], dict[int, list]] = {}
+    page = 0
+    unit, mag = 1.0, 1000.0
+    header_sp = None  # top band where running heads repeat section titles (credited to their \section line)
+    try:
+        with gzip.open(synctex_path, "rt", encoding="utf-8", errors="replace") as fh:
+            for raw in fh:
+                head = raw[:1]
+                if head == "{":
+                    page = int(raw[1:] or 0)
+                elif head == "I" and raw.startswith("Input:"):
+                    tag, _, path = raw[6:].rstrip("\n").partition(":")
+                    inputs[tag] = _to_project_path(root, path)
+                elif head == "U" and raw.startswith("Unit:"):
+                    unit = float(raw[5:])
+                elif head == "M" and raw.startswith("Magnification:"):
+                    mag = float(raw[14:]) or 1000.0
+                elif page and head in "(hxkg$":
+                    m = RECORD.match(raw)
+                    if not m:
+                        continue
+                    file = inputs.get(m.group(1))
+                    if not file:
+                        continue
+                    h, v = int(m.group(3)), int(m.group(4)) - int(m.group(6) or 0)  # baseline - height = top
+                    if h <= 0 or v <= 0:
+                        continue  # boxes at the page origin (unplaced marks and the like)
+                    if header_sp is None:
+                        header_sp = HEADER_BAND_BP / (SP_TO_BP * unit * mag / 1000)
+                    stats = seen.setdefault((file, int(m.group(2))), {}).setdefault(page, [0, None, 0, v])
+                    if v >= header_sp:
+                        stats[0] += 1
+                        stats[1] = v if stats[1] is None else min(stats[1], v)
+                    stats[2] += 1
+                    stats[3] = min(stats[3], v)
+    except (OSError, EOFError, ValueError):
+        return {}
+
+    scale = SP_TO_BP * unit * mag / 1000
+    result = {}
+    for loc, pages in seen.items():
+        # The last page: a \chapter (or any line where a page break happens) also gets the frame
+        # of the page shipped out before it. Header-band records only count if that is all there is.
+        body = [p for p, s in pages.items() if s[0]]
+        best = max(body or pages)
+        result[loc] = (best, round(pages[best][1 if body else 3] * scale, 2))
+    _line_cache[key] = (mtime, result)
+    return result

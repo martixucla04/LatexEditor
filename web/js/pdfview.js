@@ -82,6 +82,7 @@ export async function showPdf(url) {
   }
   oldTask?.destroy();
   updateIndicators();
+  notifyView();
 }
 
 export function clearPdf() {
@@ -94,6 +95,7 @@ export function clearPdf() {
   pdfDoc = null;
   emptyState.hidden = false;
   updateIndicators();
+  notifyView();
 }
 
 export function zoom(steps) {
@@ -167,6 +169,59 @@ export function highlightBoxes(boxes) {
     for (const el of container.querySelectorAll(".synctex-flash")) el.remove();
   }, 2500);
   return firstTop !== null;
+}
+
+// ---------------------------------------------------------------------------
+// Reading position, for the outline: which point of the PDF is in view
+// ---------------------------------------------------------------------------
+
+const viewListeners = [];
+let viewFrame = 0;
+
+// fn() is called (at most once per frame) when the visible part of the PDF changes.
+export function onViewChange(fn) {
+  viewListeners.push(fn);
+}
+
+function notifyView() {
+  if (viewFrame) return;
+  viewFrame = requestAnimationFrame(() => {
+    viewFrame = 0;
+    for (const fn of viewListeners) fn();
+  });
+}
+
+container.addEventListener("scroll", notifyView, { passive: true });
+eventBus.on("scalechanging", notifyView);
+
+// {page, y} (PDF points from the page top) of the point a quarter down the visible area
+// (the bottom of it once scrolled to the end, where the last headings never reach the top).
+export function viewPosition() {
+  if (!pdfDoc) return null;
+  const box = container.getBoundingClientRect();
+  const atEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - 2;
+  const ref = box.top + (atEnd ? container.clientHeight - 1 : container.clientHeight / 4);
+  for (let i = 0; i < pdfDoc.numPages; i++) {
+    const pageView = viewer.getPageView(i);
+    if (!pageView) continue;
+    const rect = pageView.div.getBoundingClientRect();
+    if (rect.bottom < ref) continue;
+    if (rect.top > ref) return { page: i + 1, y: 0 }; // in the gap above this page
+    const [, py] = pageView.viewport.convertToPdfPoint(0, ref - rect.top - pageView.div.clientTop);
+    return { page: i + 1, y: pageView.viewport.viewBox[3] - py };
+  }
+  return { page: pdfDoc.numPages, y: Infinity };
+}
+
+// Scroll so that point `y` (PDF points from the top) of `page` is near the top of the view.
+export function scrollToPdfPoint(page, y) {
+  const pageView = pdfDoc && viewer.getPageView(page - 1);
+  if (!pageView) return;
+  const { viewport, div } = pageView;
+  const [x0, , , y1] = viewport.viewBox;
+  const [, vy] = viewport.convertToViewportPoint(x0, y1 - y);
+  const top = div.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop + div.clientTop + vy;
+  container.scrollTo({ top: Math.max(0, top - 12), behavior: "smooth" });
 }
 
 $("btn-zoom-in").addEventListener("click", () => zoom(1));

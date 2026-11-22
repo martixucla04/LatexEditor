@@ -27,9 +27,11 @@ left, see the PDF on the right. See [PLAN.md](PLAN.md) for the design and how it
   unchanged projects are not rebuilt and a `.bib`-only change skips the first LaTeX run
 - PDF preview that keeps its zoom and position; SyncTeX (Ctrl+Alt+J ↔ double-click in the PDF)
 - Problems panel with clickable errors and squiggles in the editor
-- **Outline** tab in the side panel: parts, chapters, sections and subsections in reading order
-  (following `\input`/`\include` from the main file, unsaved edits included); click one to jump
-  there, the one the cursor is in is highlighted
+- **Outline** to the right of the PDF (hide/show with the button at the end of the PDF toolbar):
+  parts, chapters, sections and subsections in reading order (following `\input`/`\include`
+  from the main file, unsaved edits included). A blue bar marks the heading the editor cursor is
+  in, a fill the heading of the part of the PDF in view (positions from SyncTeX, updated on each
+  compile). Click a heading to go there in both the code and the PDF
 - **Equation preview**: with the cursor inside `$…$`, `\(…\)`, `\[…\]`, `$$…$$` or an
   `equation`/`align`/`gather`/`multline`… environment, the rendered math (MathJax) shows below it,
   or the error if it does not parse. Macros defined in the preamble are not known to the preview

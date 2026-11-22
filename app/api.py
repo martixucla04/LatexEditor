@@ -312,8 +312,20 @@ class Api:
         return self._require_project().add_spell_word(word)
 
     def outline(self, overrides: dict | None = None):
-        """Headings of the whole document in reading order; `overrides` = unsaved buffers {path: text}."""
-        return outline.outline(self._require_project(), overrides)
+        """Headings of the whole document in reading order; `overrides` = unsaved buffers {path: text}.
+
+        Each heading gets `pdf: {page, y}` (PDF points from the page top) from the last build.
+        """
+        project = self._require_project()
+        items = outline.outline(project, overrides)
+        pdf = project.pdf_path
+        if pdf is not None:
+            where = synctex.line_positions(project.root, pdf.with_suffix(".synctex.gz"))
+            for item in items:
+                if (item["file"], item["line"]) in where:
+                    page, y = where[(item["file"], item["line"])]
+                    item["pdf"] = {"page": page, "y": y}
+        return items
 
     def completion_data(self):
         """Labels, bibliography entries, user macros and files for autocomplete."""

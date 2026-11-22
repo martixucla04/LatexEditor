@@ -1,3 +1,7 @@
+import shutil
+
+import pytest
+
 from app.outline import clean_title, outline
 from app.project import Project
 
@@ -36,3 +40,24 @@ def test_outline_uses_unsaved_text(make_project):
 def test_clean_title():
     assert clean_title("A~\\emph{b}\\label{sec:x} $x^2$") == "A b x^2"
     assert clean_title("  ") == "(untitled)"
+
+
+@pytest.mark.latex
+@pytest.mark.skipif(shutil.which("lualatex") is None, reason="lualatex not installed")
+def test_headings_get_their_pdf_page_and_position(make_project, settings):
+    from app.api import Api
+    from app.builder import Builder
+
+    # running heads repeat section titles at the top of later pages; \\chapter starts a page
+    root = make_project({
+        "main.tex": "\\documentclass{report}\n\\pagestyle{headings}\n\\begin{document}\n"
+                    "\\chapter{One}\nText.\n\\section{Alpha}\n\\input{more}\n\\chapter{Two}\nEnd.\n\\end{document}\n",
+        "more.tex": "\\clearpage\nPage two.\n\\section{Beta}\nText.\n\\clearpage\nPage three.\n",
+    })
+    assert Builder(root, "main.tex").run().status == "success"
+    api = Api(settings)
+    api.open_project(str(root))
+    at = {i["title"]: (i["pdf"]["page"], i["pdf"]["y"]) for i in api.outline()}
+    assert [p for p, _ in at.values()] == [1, 1, 2, 4]  # Two: on its own page, not the one before
+    assert at["One"][1] < at["Alpha"][1]
+    assert all(y > 50 for _, y in at.values())  # never the running head

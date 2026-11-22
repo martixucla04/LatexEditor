@@ -69,7 +69,6 @@
         <div class="sidebar-tabs" role="tablist">
           <button class="sidebar-tab active" data-view="files" role="tab" aria-selected="true">Files</button>
           <button class="sidebar-tab" data-view="search" role="tab" aria-selected="false" title="Search in the project (Ctrl+Shift+F)">Search</button>
-          <button class="sidebar-tab" data-view="outline" role="tab" aria-selected="false" title="Chapters and sections of the document">Outline</button>
         </div>
         <div class="spacer"></div>
         <div class="tb-group" id="file-actions">
@@ -86,9 +85,6 @@
       </div>
       <div class="pane-body" id="file-tree" data-view-body="files">
         <p class="empty-state">No project open.</p>
-      </div>
-      <div class="pane-body outline-view" id="outline-view" data-view-body="outline" hidden>
-        <div id="outline-list"><p class="empty-state">No project open.</p></div>
       </div>
       <div class="search-view" id="search-view" data-view-body="search" hidden>
         <div class="search-form">
@@ -204,12 +200,24 @@
         <button class="tb-btn icon-only small" id="btn-fit-width" disabled title="Fit width">
           <svg viewBox="0 0 24 24"><path d="M4 12h16M7 9l-3 3 3 3M17 9l3 3-3 3"/></svg>
         </button>
+        <button class="tb-btn icon-only small" id="btn-outline" aria-pressed="true" title="Show or hide the document outline">
+          <svg viewBox="0 0 24 24"><path d="M4 6h3M10 6h10M7 12h3M13 12h7M7 18h3M13 18h7"/></svg>
+        </button>
       </div>
-      <div class="pdf-viewer" id="pdf-viewer">
-        <div class="pdf-container" id="pdf-container">
-          <div class="pdfViewer" id="pdf-pages"></div>
+      <div class="pdf-body">
+        <div class="pdf-viewer" id="pdf-viewer">
+          <div class="pdf-container" id="pdf-container">
+            <div class="pdfViewer" id="pdf-pages"></div>
+          </div>
+          <p class="empty-state pdf-empty" id="pdf-empty">The PDF preview appears here after you compile.</p>
         </div>
-        <p class="empty-state pdf-empty" id="pdf-empty">The PDF preview appears here after you compile.</p>
+        <aside class="pdf-outline" id="outline-view" aria-label="Document outline">
+          <div class="outline-header">
+            <span class="pane-title">Outline</span>
+            <span class="outline-legend"><i class="legend-code"></i>Code <i class="legend-pdf"></i>PDF</span>
+          </div>
+          <div class="outline-list" id="outline-list"><p class="empty-state">No project open.</p></div>
+        </aside>
       </div>
     </section>
   </main>

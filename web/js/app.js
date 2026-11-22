@@ -430,6 +430,7 @@ async function compile() {
     if (result.pdf_url) {
       project.has_pdf = true;
       await showPdf(result.pdf_url);
+      refreshOutline(); // new PDF positions of the headings
     }
     if (result.status === "failed") {
       if (!c.error) showPanel("log");
